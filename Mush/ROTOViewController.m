@@ -591,20 +591,24 @@ int numTriangles = 0;
                 GLKVector3 cellCenter = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
                 
                 GRIDCELL cell;
-                int cellVertexIndex = 0;
-                for (float cy = -0.5; cy < 1; cy += 1.0)
+                GLKVector3 normalizedCellVertices[8] = {
+                    {-0.5, -0.5, 0.5},
+                    {0.5, -0.5, 0.5},
+                    {0.5, -0.5, -0.5},
+                    {-0.5, -0.5, -0.5},
+                    {-0.5, 0.5, 0.5},
+                    {0.5, 0.5, 0.5},
+                    {0.5, 0.5, -0.5},
+                    {-0.5, 0.5, -0.5},
+                };
+                for (int i = 0; i < 8; i++)
                 {
-                    for (float cz = -0.5; cz < 1; cz += 1.0)
-                    {
-                        for (float cx = -0.5; cx < 1; cx += 1.0)
-                        {
-                            GLKVector3 cellVertexOffset = GLKVector3Make(cx * cellDim, cy * cellDim, cz * cellDim);
-                            GLKVector3 cellVertexPos = GLKVector3Add(cellCenter, cellVertexOffset);
-                            cell.p[cellVertexIndex] = XYZFromGLKVector3(cellVertexPos);
-                            cell.val[cellVertexIndex] = GLKVector3Distance(sphereCenter, cellVertexPos);
-                            ++cellVertexIndex;
-                        }
-                    }
+                    GLKVector3 v = normalizedCellVertices[i];
+                    GLKVector3 cellVertexOffset = GLKVector3Make(v.x * cellDim, v.y * cellDim, v.z * cellDim);
+                    GLKVector3 cellVertexPos = GLKVector3Add(cellCenter, cellVertexOffset);
+                    cell.p[i] = XYZFromGLKVector3(cellVertexPos);
+                    cell.val[i] = GLKVector3Distance(sphereCenter, cellVertexPos);
+//                    cell.val[i] = cellVertexPos.y;
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
                 grid[gridCellIndex] = cell;
@@ -617,7 +621,7 @@ int numTriangles = 0;
     TRIANGLE *triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
     for (int i = 0; i < numGridCells; i++)
     {
-        numTriangles += Polygonise(grid[i], 0.5, &triangles[numTriangles]);
+        numTriangles += Polygonise(grid[i], 1.0, &triangles[numTriangles]);
     }
 
     glGenBuffers(1, &_vertexBuffer);
@@ -634,6 +638,8 @@ int numTriangles = 0;
 
     free(grid);
     free(triangles);
+    
+    glEnable(GL_CULL_FACE);
 }
 
 - (void)tearDownGL
@@ -657,11 +663,12 @@ int numTriangles = 0;
     GLKMatrix4 projectionMatrix = GLKMatrix4MakePerspective(GLKMathDegreesToRadians(65.0f), aspect, 0.1f, 100.0f);
     
     GLKMatrix4 baseModelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, -4.0f);
-    baseModelViewMatrix = GLKMatrix4Rotate(baseModelViewMatrix, _rotation, 0.0f, 1.0f, 0.0f);
+    
+//    _rotation = 2 * M_PI;
     
     // Compute the model view matrix for the object rendered with ES2
-    GLKMatrix4 modelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 1.5f);
-    modelViewMatrix = GLKMatrix4Rotate(modelViewMatrix, _rotation, 1.0f, 1.0f, 1.0f);
+    GLKMatrix4 modelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
+    modelViewMatrix = GLKMatrix4Rotate(modelViewMatrix, _rotation, 1.0f, 0.0f, 0.0f);
     modelViewMatrix = GLKMatrix4Multiply(baseModelViewMatrix, modelViewMatrix);
     
 //    _normalMatrix = GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(modelViewMatrix), NULL);
@@ -684,7 +691,8 @@ int numTriangles = 0;
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
 //    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
     
-    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
+    glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
+//    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
 }
 
 #pragma mark -  OpenGL ES 2 shader compilation

@@ -20,7 +20,7 @@ void main()
 {
 //    vec3 eyeNormal = normalize(normalMatrix * normal);
 //    vec3 lightPosition = vec3(0.0, 0.0, 1.0);
-    vec4 diffuseColor = vec4(0.4, 0.4, 1.0, 1.0);
+    vec4 diffuseColor = vec4((position.x + .5) / 2.0, (position.y + 0.5) / 2.0, (position.z + 0.5) / 2.0, 1.0);
 //
 //    float nDotVP = max(0.0, dot(eyeNormal, normalize(lightPosition)));
 //                 
@@ -29,5 +29,5 @@ void main()
     colorVarying = diffuseColor;
     
     gl_Position = modelViewProjectionMatrix * position;
-    gl_PointSize = 10.0;
+    gl_PointSize = 2.0;
 }
