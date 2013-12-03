@@ -6,9 +6,13 @@
 //  Copyright (c) 2013 Rototyping. All rights reserved.
 //
 
-varying lowp vec4 colorVarying;
+#version 300 es
+
+in lowp vec4 colorVarying;
+
+out lowp vec4 fragColor;
 
 void main()
 {
-    gl_FragColor = colorVarying;
+    fragColor = colorVarying;
 }

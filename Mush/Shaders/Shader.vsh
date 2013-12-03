@@ -6,10 +6,12 @@
 //  Copyright (c) 2013 Rototyping. All rights reserved.
 //
 
-attribute vec4 position;
-attribute vec3 normal;
+#version 300 es
 
-varying lowp vec4 colorVarying;
+in vec4 position;
+in vec3 normal;
+
+out lowp vec4 colorVarying;
 
 uniform mat4 modelViewProjectionMatrix;
 uniform mat3 normalMatrix;
@@ -25,4 +27,5 @@ void main()
     colorVarying = diffuseColor * nDotVP;
     
     gl_Position = modelViewProjectionMatrix * position;
+    gl_PointSize = 100.0;
 }
