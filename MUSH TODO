@@ -1,0 +1,14 @@
+MUSH TODO
+---------
+
+OPTIMIZATIONS
+- share cell vertices instead of having each cell recalculate shared vertex positions/vals
+- crawling cubes (start at a cell that's on the surface then only explore neighbor cells that are also on the surface)
+
+LOOKS
+- Surface normals (do flat shading aka one normal per cell (calculated at the center))
+
+PLAY
+- a big ball with little ones orbiting it
+- a value field that starts with all 1s (a cube) and then you can add/subtract from the volume by touching and value is added/subtracted from the cells around the one your touch hit
+  * can figure out what cell was touched by having a render buffer whose pixels store the xyz of the cell that generated that face
