@@ -450,8 +450,6 @@ static int Polygonise(GRIDCELL grid, double isolevel, TRIANGLE *triangles)
     return(ntriang);
 }
 
-int numTriangles = 0;
-
 @interface ROTOViewController () {
     GLuint _program;
     
@@ -519,17 +517,8 @@ int numTriangles = 0;
     // Dispose of any resources that can be recreated.
 }
 
-- (void)setupGL
+static int meshMetaballs(TRIANGLE **out_triangles)
 {
-    [EAGLContext setCurrentContext:self.context];
-    
-    [self loadShaders];
-    
-    glEnable(GL_DEPTH_TEST);
-    
-    glGenVertexArraysOES(1, &_vertexArray);
-    glBindVertexArrayOES(_vertexArray);
-    
     GLKVector3 sphereCenter = GLKVector3Make(0, 0, 0);
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
@@ -561,7 +550,6 @@ int numTriangles = 0;
                     GLKVector3 cellVertexPos = GLKVector3Add(cellCenter, cellVertexOffset);
                     cell.p[i] = XYZFromGLKVector3(cellVertexPos);
                     cell.val[i] = GLKVector3Distance(sphereCenter, cellVertexPos);
-//                    cell.val[i] = cellVertexPos.y;
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
                 grid[gridCellIndex] = cell;
@@ -571,15 +559,31 @@ int numTriangles = 0;
     
     int maxTrianglesPerCell = 2;
     int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
+    int numTriangles = 0;
     TRIANGLE *triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
     for (int i = 0; i < numGridCells; i++)
     {
         numTriangles += Polygonise(grid[i], 1.0, &triangles[numTriangles]);
     }
+    free(grid);
+    
+    *out_triangles = triangles;
+    return numTriangles;
+}
 
+- (void)setupGL
+{
+    [EAGLContext setCurrentContext:self.context];
+    
+    [self loadShaders];
+    
+    glEnable(GL_DEPTH_TEST);
+    
+    glGenVertexArraysOES(1, &_vertexArray);
+    glBindVertexArrayOES(_vertexArray);
+    
     glGenBuffers(1, &_vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), triangles, GL_STATIC_DRAW);
     
     glEnableVertexAttribArray(GLKVertexAttribPosition);
     glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(XYZ), BUFFER_OFFSET(0));
@@ -587,9 +591,6 @@ int numTriangles = 0;
 //    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, 24, BUFFER_OFFSET(12));
     
     glBindVertexArrayOES(0);
-
-    free(grid);
-    free(triangles);
     
     glEnable(GL_CULL_FACE);
 }
@@ -642,6 +643,12 @@ int numTriangles = 0;
     
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
 //    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
+    
+    TRIANGLE *triangles;
+    int numTriangles = meshMetaballs(&triangles);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), triangles, GL_STATIC_DRAW);
+    free(triangles);
     
     glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
 //    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
