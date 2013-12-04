@@ -27,10 +27,10 @@ enum
     NUM_ATTRIBUTES
 };
 
-static float cellDim = 0.1;
-static int numXCells = 100;
-static int numYCells = 100;
-static int numZCells = 100;
+static float cellDim = 0.5;
+static int numXCells = 20;
+static int numYCells = 20;
+static int numZCells = 20;
 
 typedef struct {
     float x, y, z;
