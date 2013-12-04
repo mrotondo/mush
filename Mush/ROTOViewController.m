@@ -28,7 +28,7 @@ enum
     NUM_ATTRIBUTES
 };
 
-static float cellDim = 0.25;
+static float cellDim = 0.22;
 static int numXCells = 25;
 static int numYCells = 25;
 static int numZCells = 25;
@@ -102,8 +102,6 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
         }
         self.context = nil;
     }
-
-    // Dispose of any resources that can be recreated.
 }
 
 static float GLKVector3SquaredLength(GLKVector3 vector)
@@ -117,7 +115,7 @@ static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(int numMetaballs, GLKVector3 *metaballPositions, TRIANGLE **out_triangles)
+static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out_triangles)
 {
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
@@ -152,7 +150,10 @@ static int meshMetaballs(int numMetaballs, GLKVector3 *metaballPositions, TRIANG
                     cell.val[v_i] = 0;
                     for (int m_i = 0; m_i < numMetaballs; m_i++)
                     {
-                        cell.val[v_i] += pointFieldStrength(metaballPositions[m_i], cellVertexPos);
+                        GLKVector4 metaball = metaballs[m_i];
+                        GLKVector3 metaballPosition = GLKVector3MakeWithArray(metaball.v);
+                        float metaballForce = metaball.w;
+                        cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballForce;
                     }
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
@@ -246,14 +247,20 @@ static int meshMetaballs(int numMetaballs, GLKVector3 *metaballPositions, TRIANG
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
 //    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
     
-    GLKVector3 metaballPositions[] = {
-        {cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation)},
-        {sinf(5 * _rotation), 2 * -sinf(_rotation), cosf(5 * _rotation)},
-        {0, 2 * cosf(_rotation), 0}
-    };
+//    GLKVector4 metaballs[] = {
+//        {cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation), 0.4},
+//        {sinf(5 * _rotation), 2 * -sinf(_rotation), cosf(5 * _rotation), 0.4},
+//        {0, 2 * cosf(_rotation), 0, 0.8}
+//    };
 
+    GLKVector4 metaballs[] = {
+        {1.8 * cosf(5 * _rotation), 0, 1.8 * sinf(5 * _rotation), 0.1},
+        {1.8 * sinf(6 * _rotation), 1.8 * cosf(6 * _rotation), 0, 0.1},
+        {0, 0, 0, 1.5}
+    };
+    
     TRIANGLE *triangles;
-    int numTriangles = meshMetaballs(3, metaballPositions, &triangles);
+    int numTriangles = meshMetaballs(3, metaballs, &triangles);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), triangles, GL_STATIC_DRAW);
     free(triangles);
