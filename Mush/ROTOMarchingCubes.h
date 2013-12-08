@@ -14,11 +14,19 @@ typedef struct {
 } XYZ;
 
 typedef struct {
-    XYZ p[3];
+    XYZ p;
+    XYZ n;
+    XYZ c;
+} VERTEX;
+
+typedef struct {
+    VERTEX p[3];
 } TRIANGLE;
 
 typedef struct {
     XYZ p[8];
+    XYZ n;
+    XYZ c;
     double val[8];
 } GRIDCELL;
 

@@ -15,7 +15,7 @@
 enum
 {
     UNIFORM_MODELVIEWPROJECTION_MATRIX,
-//    UNIFORM_NORMAL_MATRIX,
+    UNIFORM_NORMAL_MATRIX,
     NUM_UNIFORMS
 };
 GLint uniforms[NUM_UNIFORMS];
@@ -24,14 +24,21 @@ GLint uniforms[NUM_UNIFORMS];
 enum
 {
     ATTRIB_VERTEX,
-//    ATTRIB_NORMAL,
+    ATTRIB_NORMAL,
+    ATTRIB_COLOR,
     NUM_ATTRIBUTES
 };
 
-static float cellDim = 0.22;
+static float cellDim = 0.3;
 static int numXCells = 25;
 static int numYCells = 25;
 static int numZCells = 25;
+
+typedef struct {
+    GLKVector3 position;
+    GLKVector3 color;
+    float size;
+} Metaball;
 
 static XYZ XYZFromGLKVector3(GLKVector3 v)
 {
@@ -43,7 +50,7 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     GLuint _program;
     
     GLKMatrix4 _modelViewProjectionMatrix;
-//    GLKMatrix3 _normalMatrix;
+    GLKMatrix3 _normalMatrix;
     float _rotation;
     
     GLuint _vertexArray;
@@ -115,7 +122,7 @@ static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out_triangles)
+static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE **out_triangles)
 {
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
@@ -127,9 +134,27 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
         {
             for (int z = 0; z < numZCells; z++)
             {
-                GLKVector3 cellCenter = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
-                
                 GRIDCELL cell;
+                GLKVector3 cellCenter = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
+
+                GLKVector3 normal = GLKVector3Make(0, 0, 0);
+                GLKVector3 color = GLKVector3Make(0, 0, 0);
+                float totalForce = 0;
+                for (int m_i = 0; m_i < numMetaballs; m_i++)
+                {
+                    Metaball metaball = metaballs[m_i];
+                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, metaball.position));
+                    float metaballSize = metaball.size;
+                    float contribution = pointFieldStrength(metaball.position, cellCenter) * metaballSize;
+                    normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contribution), normal);
+                    color = GLKVector3Add(GLKVector3MultiplyScalar(metaball.color, contribution), color);
+                    totalForce += contribution;
+                }
+                normal = GLKVector3DivideScalar(normal, totalForce);
+                cell.n = XYZFromGLKVector3(normal);
+                color = GLKVector3DivideScalar(color, totalForce);
+                cell.c = XYZFromGLKVector3(color);
+                
                 GLKVector3 normalizedCellVertices[8] = {
                     {-0.5, -0.5, 0.5},
                     {0.5, -0.5, 0.5},
@@ -150,10 +175,10 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
                     cell.val[v_i] = 0;
                     for (int m_i = 0; m_i < numMetaballs; m_i++)
                     {
-                        GLKVector4 metaball = metaballs[m_i];
-                        GLKVector3 metaballPosition = GLKVector3MakeWithArray(metaball.v);
-                        float metaballForce = metaball.w;
-                        cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballForce;
+                        Metaball metaball = metaballs[m_i];
+                        GLKVector3 metaballPosition = metaball.position;
+                        float metaballSize = metaball.size;
+                        cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballSize;
                     }
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
@@ -191,9 +216,11 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     
     glEnableVertexAttribArray(GLKVertexAttribPosition);
-    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(XYZ), BUFFER_OFFSET(0));
-//    glEnableVertexAttribArray(GLKVertexAttribNormal);
-//    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, 24, BUFFER_OFFSET(12));
+    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(0));
+    glEnableVertexAttribArray(GLKVertexAttribNormal);
+    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(sizeof(XYZ)));
+    glEnableVertexAttribArray(GLKVertexAttribColor);
+    glVertexAttribPointer(GLKVertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(sizeof(XYZ) * 2));
     
     glBindVertexArrayOES(0);
     
@@ -224,10 +251,10 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
     
     // Compute the model view matrix for the object rendered with ES2
     GLKMatrix4 modelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
-    modelViewMatrix = GLKMatrix4Rotate(modelViewMatrix, _rotation, 1.0f, 1.0f, 1.0f);
+    modelViewMatrix = GLKMatrix4Rotate(modelViewMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
     modelViewMatrix = GLKMatrix4Multiply(baseModelViewMatrix, modelViewMatrix);
     
-//    _normalMatrix = GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(modelViewMatrix), NULL);
+    _normalMatrix = GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(modelViewMatrix), NULL);
     
     _modelViewProjectionMatrix = GLKMatrix4Multiply(projectionMatrix, modelViewMatrix);
     
@@ -245,22 +272,31 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
     glUseProgram(_program);
     
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
-//    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
+    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
     
-//    GLKVector4 metaballs[] = {
-//        {cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation), 0.4},
-//        {sinf(5 * _rotation), 2 * -sinf(_rotation), cosf(5 * _rotation), 0.4},
-//        {0, 2 * cosf(_rotation), 0, 0.8}
-//    };
+    Metaball mb1, mb2, mb3, mb4;
+    mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
+    mb1.color = GLKVector3Make(0.8, 0.3, 0.4);
+    mb1.size = 0.5;
+    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
+    mb2.color = GLKVector3Make(0.9, 0.4, 0.15);
+    mb2.size = 0.8;
+    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
+    mb3.color = GLKVector3Make(0.45, 0.85, 0.2);
+    mb3.size = 0.6;
+    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
+    mb4.color = GLKVector3Make(0.65, 0.35, 0.91);
+    mb4.size = 1.2;
+    Metaball metaballs[] = {mb1, mb2, mb3, mb4};
 
-    GLKVector4 metaballs[] = {
-        {1.8 * cosf(5 * _rotation), 0, 1.8 * sinf(5 * _rotation), 0.1},
-        {1.8 * sinf(6 * _rotation), 1.8 * cosf(6 * _rotation), 0, 0.1},
-        {0, 0, 0, 1.5}
-    };
+//    GLKVector4 metaballs[] = {
+//        {1.8 * cosf(5 * _rotation), 0, 1.8 * sinf(5 * _rotation), 0.1},
+//        {1.8 * sinf(6 * _rotation), 1.8 * cosf(6 * _rotation), 0, 0.1},
+//        {0, 0, 0, 1.5}
+//    };
     
     TRIANGLE *triangles;
-    int numTriangles = meshMetaballs(3, metaballs, &triangles);
+    int numTriangles = meshMetaballs(4, metaballs, &triangles);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), triangles, GL_STATIC_DRAW);
     free(triangles);
@@ -302,7 +338,8 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
     // Bind attribute locations.
     // This needs to be done prior to linking.
     glBindAttribLocation(_program, GLKVertexAttribPosition, "position");
-//    glBindAttribLocation(_program, GLKVertexAttribNormal, "normal");
+    glBindAttribLocation(_program, GLKVertexAttribNormal, "normal");
+    glBindAttribLocation(_program, GLKVertexAttribColor, "color");
     
     // Link program.
     if (![self linkProgram:_program]) {
@@ -326,7 +363,7 @@ static int meshMetaballs(int numMetaballs, GLKVector4 *metaballs, TRIANGLE **out
     
     // Get uniform locations.
     uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = glGetUniformLocation(_program, "modelViewProjectionMatrix");
-//    uniforms[UNIFORM_NORMAL_MATRIX] = glGetUniformLocation(_program, "normalMatrix");
+    uniforms[UNIFORM_NORMAL_MATRIX] = glGetUniformLocation(_program, "normalMatrix");
     
     // Release vertex and fragment shaders.
     if (vertShader) {
