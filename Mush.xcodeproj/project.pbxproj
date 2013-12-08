@@ -26,6 +26,7 @@
 		D586F068184DA48B00FE89BD /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D586F03F184DA48B00FE89BD /* UIKit.framework */; };
 		D586F070184DA48B00FE89BD /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = D586F06E184DA48B00FE89BD /* InfoPlist.strings */; };
 		D586F072184DA48B00FE89BD /* MushTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D586F071184DA48B00FE89BD /* MushTests.m */; };
+		D591761818551E35007DCD6A /* ROTOShaderLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = D591761718551E35007DCD6A /* ROTOShaderLoader.m */; };
 		D5D004BD184F015F005D791B /* ROTOMarchingCubes.c in Sources */ = {isa = PBXBuildFile; fileRef = D5D004BC184F015F005D791B /* ROTOMarchingCubes.c */; };
 /* End PBXBuildFile section */
 
@@ -64,6 +65,8 @@
 		D586F06D184DA48B00FE89BD /* MushTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "MushTests-Info.plist"; sourceTree = "<group>"; };
 		D586F06F184DA48B00FE89BD /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		D586F071184DA48B00FE89BD /* MushTests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = MushTests.m; sourceTree = "<group>"; };
+		D591761618551E35007DCD6A /* ROTOShaderLoader.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ROTOShaderLoader.h; sourceTree = "<group>"; };
+		D591761718551E35007DCD6A /* ROTOShaderLoader.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ROTOShaderLoader.m; sourceTree = "<group>"; };
 		D5D004BB184F0153005D791B /* ROTOMarchingCubes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ROTOMarchingCubes.h; sourceTree = "<group>"; };
 		D5D004BC184F015F005D791B /* ROTOMarchingCubes.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = ROTOMarchingCubes.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -141,6 +144,8 @@
 				D586F046184DA48B00FE89BD /* Supporting Files */,
 				D5D004BB184F0153005D791B /* ROTOMarchingCubes.h */,
 				D5D004BC184F015F005D791B /* ROTOMarchingCubes.c */,
+				D591761618551E35007DCD6A /* ROTOShaderLoader.h */,
+				D591761718551E35007DCD6A /* ROTOShaderLoader.m */,
 			);
 			path = Mush;
 			sourceTree = "<group>";
@@ -279,6 +284,7 @@
 				D586F05D184DA48B00FE89BD /* ROTOViewController.m in Sources */,
 				D586F04C184DA48B00FE89BD /* main.m in Sources */,
 				D5D004BD184F015F005D791B /* ROTOMarchingCubes.c in Sources */,
+				D591761818551E35007DCD6A /* ROTOShaderLoader.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -363,6 +369,7 @@
 					"$(inherited)",
 				);
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -397,6 +404,7 @@
 				COPY_PHASE_STRIP = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
+				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;

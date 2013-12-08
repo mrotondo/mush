@@ -8,17 +8,9 @@
 
 #import "ROTOViewController.h"
 #import "ROTOMarchingCubes.h"
+#import "ROTOShaderLoader.h"
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
-
-// Uniform index.
-enum
-{
-    UNIFORM_MODELVIEWPROJECTION_MATRIX,
-    UNIFORM_NORMAL_MATRIX,
-    NUM_UNIFORMS
-};
-GLint uniforms[NUM_UNIFORMS];
 
 // Attribute index.
 enum
@@ -55,16 +47,14 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     
     GLuint _vertexArray;
     GLuint _vertexBuffer;
+    
+    TRIANGLE *_triangles;
+    GRIDCELL *_grid;
+    
 }
 @property (strong, nonatomic) EAGLContext *context;
+@property (strong, nonatomic) NSMutableArray *points;
 
-- (void)setupGL;
-- (void)tearDownGL;
-
-- (BOOL)loadShaders;
-- (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file;
-- (BOOL)linkProgram:(GLuint)prog;
-- (BOOL)validateProgram:(GLuint)prog;
 @end
 
 @implementation ROTOViewController
@@ -74,21 +64,34 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     [super viewDidLoad];
     
     self.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
-
+    
     if (!self.context) {
         NSLog(@"Failed to create ES context");
     }
     
+    int maxTrianglesPerCell = 2;
+    int numGridCells = numXCells * numYCells * numZCells;
+    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
+    _triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
+    _grid = malloc(numGridCells * sizeof(GRIDCELL));
+
     GLKView *view = (GLKView *)self.view;
     view.context = self.context;
     view.drawableDepthFormat = GLKViewDrawableDepthFormat24;
-    
+
     [self setupGL];
+    
+    self.points = [NSMutableArray array];
+    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
+    [self.view addGestureRecognizer:tapRecognizer];
 }
 
 - (void)dealloc
 {    
     [self tearDownGL];
+    
+    free(_triangles);
+    free(_grid);
     
     if ([EAGLContext currentContext] == self.context) {
         [EAGLContext setCurrentContext:nil];
@@ -122,12 +125,10 @@ static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE **out_triangles)
+static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *triangles, GRIDCELL *grid)
 {
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
-    int numGridCells = numXCells * numYCells * numZCells;
-    GRIDCELL *grid = malloc(numGridCells * sizeof(GRIDCELL));
     for (int x = 0; x < numXCells; x++)
     {
         for (int y = 0; y < numYCells; y++)
@@ -187,17 +188,13 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE **out_
         }
     } // lol nesting
     
-    int maxTrianglesPerCell = 2;
-    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
     int numTriangles = 0;
-    TRIANGLE *triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
+    int numGridCells = numXCells * numYCells * numZCells;
     for (int i = 0; i < numGridCells; i++)
     {
         numTriangles += Polygonise(grid[i], 1.0, &triangles[numTriangles]);
     }
-    free(grid);
     
-    *out_triangles = triangles;
     return numTriangles;
 }
 
@@ -205,7 +202,7 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE **out_
 {
     [EAGLContext setCurrentContext:self.context];
     
-    [self loadShaders];
+    _program = [ROTOShaderLoader loadShaders];
     
     glEnable(GL_DEPTH_TEST);
     
@@ -295,167 +292,21 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE **out_
 //        {0, 0, 0, 1.5}
 //    };
     
-    TRIANGLE *triangles;
-    int numTriangles = meshMetaballs(4, metaballs, &triangles);
+    int numTriangles = meshMetaballs(4, metaballs, _triangles, _grid);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), triangles, GL_STATIC_DRAW);
-    free(triangles);
+    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), _triangles, GL_STATIC_DRAW);
     
     glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
 //    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
 }
 
-#pragma mark -  OpenGL ES 2 shader compilation
+#pragma mark - Touch Handling
 
-- (BOOL)loadShaders
+- (void)handleTap:(UITapGestureRecognizer *)recognizer
 {
-    GLuint vertShader, fragShader;
-    NSString *vertShaderPathname, *fragShaderPathname;
-    
-    // Create shader program.
-    _program = glCreateProgram();
-    
-    // Create and compile vertex shader.
-    vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"vsh"];
-    if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname]) {
-        NSLog(@"Failed to compile vertex shader");
-        return NO;
-    }
-    
-    // Create and compile fragment shader.
-    fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"Shader" ofType:@"fsh"];
-    if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname]) {
-        NSLog(@"Failed to compile fragment shader");
-        return NO;
-    }
-    
-    // Attach vertex shader to program.
-    glAttachShader(_program, vertShader);
-    
-    // Attach fragment shader to program.
-    glAttachShader(_program, fragShader);
-    
-    // Bind attribute locations.
-    // This needs to be done prior to linking.
-    glBindAttribLocation(_program, GLKVertexAttribPosition, "position");
-    glBindAttribLocation(_program, GLKVertexAttribNormal, "normal");
-    glBindAttribLocation(_program, GLKVertexAttribColor, "color");
-    
-    // Link program.
-    if (![self linkProgram:_program]) {
-        NSLog(@"Failed to link program: %d", _program);
-        
-        if (vertShader) {
-            glDeleteShader(vertShader);
-            vertShader = 0;
-        }
-        if (fragShader) {
-            glDeleteShader(fragShader);
-            fragShader = 0;
-        }
-        if (_program) {
-            glDeleteProgram(_program);
-            _program = 0;
-        }
-        
-        return NO;
-    }
-    
-    // Get uniform locations.
-    uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = glGetUniformLocation(_program, "modelViewProjectionMatrix");
-    uniforms[UNIFORM_NORMAL_MATRIX] = glGetUniformLocation(_program, "normalMatrix");
-    
-    // Release vertex and fragment shaders.
-    if (vertShader) {
-        glDetachShader(_program, vertShader);
-        glDeleteShader(vertShader);
-    }
-    if (fragShader) {
-        glDetachShader(_program, fragShader);
-        glDeleteShader(fragShader);
-    }
-    
-    return YES;
-}
-
-- (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file
-{
-    GLint status;
-    const GLchar *source;
-    
-    source = (GLchar *)[[NSString stringWithContentsOfFile:file encoding:NSUTF8StringEncoding error:nil] UTF8String];
-    if (!source) {
-        NSLog(@"Failed to load vertex shader");
-        return NO;
-    }
-    
-    *shader = glCreateShader(type);
-    glShaderSource(*shader, 1, &source, NULL);
-    glCompileShader(*shader);
-    
-#if defined(DEBUG)
-    GLint logLength;
-    glGetShaderiv(*shader, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0) {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetShaderInfoLog(*shader, logLength, &logLength, log);
-        NSLog(@"Shader compile log:\n%s", log);
-        free(log);
-    }
-#endif
-    
-    glGetShaderiv(*shader, GL_COMPILE_STATUS, &status);
-    if (status == 0) {
-        glDeleteShader(*shader);
-        return NO;
-    }
-    
-    return YES;
-}
-
-- (BOOL)linkProgram:(GLuint)prog
-{
-    GLint status;
-    glLinkProgram(prog);
-    
-#if defined(DEBUG)
-    GLint logLength;
-    glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0) {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetProgramInfoLog(prog, logLength, &logLength, log);
-        NSLog(@"Program link log:\n%s", log);
-        free(log);
-    }
-#endif
-    
-    glGetProgramiv(prog, GL_LINK_STATUS, &status);
-    if (status == 0) {
-        return NO;
-    }
-    
-    return YES;
-}
-
-- (BOOL)validateProgram:(GLuint)prog
-{
-    GLint logLength, status;
-    
-    glValidateProgram(prog);
-    glGetProgramiv(prog, GL_INFO_LOG_LENGTH, &logLength);
-    if (logLength > 0) {
-        GLchar *log = (GLchar *)malloc(logLength);
-        glGetProgramInfoLog(prog, logLength, &logLength, log);
-        NSLog(@"Program validate log:\n%s", log);
-        free(log);
-    }
-    
-    glGetProgramiv(prog, GL_VALIDATE_STATUS, &status);
-    if (status == 0) {
-        return NO;
-    }
-    
-    return YES;
+//    
+//    Metaball
+//    [self.points addObject:<#(id)#>
 }
 
 @end
