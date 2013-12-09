@@ -26,10 +26,11 @@ static int numXCells = 25;
 static int numYCells = 25;
 static int numZCells = 25;
 
-typedef struct {
+typedef struct _Metaball{
     GLKVector3 position;
     GLKVector3 color;
     float size;
+    struct _Metaball *next;
 } Metaball;
 
 static XYZ XYZFromGLKVector3(GLKVector3 v)
@@ -59,10 +60,9 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     TRIANGLE *_triangles;
     GRIDCELL *_grid;
-    
+    Metaball *_metaballs;
 }
 @property (strong, nonatomic) EAGLContext *context;
-@property (strong, nonatomic) NSMutableArray *metaballs;
 
 @end
 
@@ -90,9 +90,40 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 
     [self setupGL];
     
-    self.metaballs = [NSMutableArray array];
     UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
     [self.view addGestureRecognizer:tapRecognizer];
+}
+
+- (void)addMetaball:(Metaball)mb
+{
+    Metaball **pointerToHeapMB = NULL;
+    if (_metaballs == NULL)
+    {
+        pointerToHeapMB = &_metaballs;
+    }
+    else
+    {
+        Metaball *lastMetaball = _metaballs;
+        while (lastMetaball->next != NULL)
+        {
+            lastMetaball = lastMetaball->next;
+        }
+        pointerToHeapMB = &lastMetaball->next;
+    }
+    Metaball *heapMB = (Metaball *)malloc(sizeof(Metaball));
+    memcpy(heapMB, &mb, sizeof(Metaball));
+    heapMB->next = NULL;
+    *pointerToHeapMB = heapMB;
+}
+
+- (void)freeMetaballs
+{
+    Metaball *metaball = _metaballs;
+    while (metaball != NULL) {
+        Metaball *nextMB = metaball->next;
+        free(metaball);
+        metaball = nextMB;
+    }
 }
 
 - (void)dealloc
@@ -101,6 +132,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     free(_triangles);
     free(_grid);
+    [self freeMetaballs];
     
     if ([EAGLContext currentContext] == self.context) {
         [EAGLContext setCurrentContext:nil];
@@ -134,7 +166,7 @@ static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid)
+static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *grid)
 {
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
@@ -150,16 +182,17 @@ static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
-                for (NSValue *metaballValue in metaballs)
+                Metaball *metaball = metaballs;
+                while (metaball != NULL)
                 {
-                    Metaball metaball;
-                    [metaballValue getValue:&metaball];
-                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, metaball.position));
-                    float metaballSize = metaball.size;
-                    float contribution = pointFieldStrength(metaball.position, cellCenter) * metaballSize;
+                    Metaball mb = *metaball;
+                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, mb.position));
+                    float metaballSize = mb.size;
+                    float contribution = pointFieldStrength(mb.position, cellCenter) * metaballSize;
                     normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contribution), normal);
-                    color = GLKVector3Add(GLKVector3MultiplyScalar(metaball.color, contribution), color);
+                    color = GLKVector3Add(GLKVector3MultiplyScalar(mb.color, contribution), color);
                     totalForce += contribution;
+                    metaball = mb.next;
                 }
                 normal = GLKVector3DivideScalar(normal, totalForce);
                 cell.n = XYZFromGLKVector3(normal);
@@ -184,13 +217,14 @@ static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid
                     cell.p[v_i] = XYZFromGLKVector3(cellVertexPos);
 
                     cell.val[v_i] = 0;
-                    for (NSValue *metaballValue in metaballs)
+                    Metaball *metaball = metaballs;
+                    while (metaball != NULL)
                     {
-                        Metaball metaball;
-                        [metaballValue getValue:&metaball];
-                        GLKVector3 metaballPosition = metaball.position;
-                        float metaballSize = metaball.size;
+                        Metaball mb = *metaball;
+                        GLKVector3 metaballPosition = mb.position;
+                        float metaballSize = mb.size;
                         cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballSize;
+                        metaball = mb.next;
                     }
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
@@ -287,26 +321,22 @@ static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid
     mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
     mb1.color = GLKVector3Make(0.8, 0.3, 0.4);
     mb1.size = 0.5;
-    NSValue *mb1Value = [NSValue valueWithBytes:&mb1 objCType:@encode(Metaball)];
     
     mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
     mb2.color = GLKVector3Make(0.9, 0.4, 0.15);
     mb2.size = 0.8;
-    NSValue *mb2Value = [NSValue valueWithBytes:&mb2 objCType:@encode(Metaball)];
     
     mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
     mb3.color = GLKVector3Make(0.45, 0.85, 0.2);
     mb3.size = 0.6;
-    NSValue *mb3Value = [NSValue valueWithBytes:&mb3 objCType:@encode(Metaball)];
 
     mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
     mb4.color = GLKVector3Make(0.65, 0.35, 0.91);
     mb4.size = 1.2;
-    NSValue *mb4Value = [NSValue valueWithBytes:&mb4 objCType:@encode(Metaball)];
 
-    NSArray *permanentMetaballs = @[mb1Value, mb2Value, mb3Value, mb4Value];
-
-    int numTriangles = meshMetaballs([self.metaballs arrayByAddingObjectsFromArray:permanentMetaballs], _triangles, _grid);
+    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
+    
+    int numTriangles = meshMetaballs(&mb1, _triangles, _grid);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), _triangles, GL_STATIC_DRAW);
     
@@ -340,8 +370,7 @@ static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid
     mb.position = pointInSpace;
     mb.color = GLKVector3Make((arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000));
     mb.size = (arc4random() / (float)0x100000000);
-    NSValue *mbValue = [NSValue valueWithBytes:&mb objCType:@encode(Metaball)];
-    [self.metaballs addObject:mbValue];
+    [self addMetaball:mb];
 }
 
 @end
