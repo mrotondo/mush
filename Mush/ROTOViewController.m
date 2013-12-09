@@ -38,9 +38,18 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     return p;
 }
 
+static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
+{
+    return GLKVector2Make(p.x, p.y);
+}
+
 @interface ROTOViewController () {
     GLuint _program;
     
+    GLKMatrix4 _modelMatrix;
+    GLKMatrix4 _viewMatrix;
+    GLKMatrix4 _modelViewMatrix;
+    GLKMatrix4 _projectionMatrix;
     GLKMatrix4 _modelViewProjectionMatrix;
     GLKMatrix3 _normalMatrix;
     float _rotation;
@@ -53,7 +62,7 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     
 }
 @property (strong, nonatomic) EAGLContext *context;
-@property (strong, nonatomic) NSMutableArray *points;
+@property (strong, nonatomic) NSMutableArray *metaballs;
 
 @end
 
@@ -81,7 +90,7 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
 
     [self setupGL];
     
-    self.points = [NSMutableArray array];
+    self.metaballs = [NSMutableArray array];
     UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
     [self.view addGestureRecognizer:tapRecognizer];
 }
@@ -125,7 +134,7 @@ static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *triangles, GRIDCELL *grid)
+static int meshMetaballs(NSArray* metaballs, TRIANGLE *triangles, GRIDCELL *grid)
 {
     GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
@@ -141,9 +150,10 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *trian
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
-                for (int m_i = 0; m_i < numMetaballs; m_i++)
+                for (NSValue *metaballValue in metaballs)
                 {
-                    Metaball metaball = metaballs[m_i];
+                    Metaball metaball;
+                    [metaballValue getValue:&metaball];
                     GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, metaball.position));
                     float metaballSize = metaball.size;
                     float contribution = pointFieldStrength(metaball.position, cellCenter) * metaballSize;
@@ -174,9 +184,10 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *trian
                     cell.p[v_i] = XYZFromGLKVector3(cellVertexPos);
 
                     cell.val[v_i] = 0;
-                    for (int m_i = 0; m_i < numMetaballs; m_i++)
+                    for (NSValue *metaballValue in metaballs)
                     {
-                        Metaball metaball = metaballs[m_i];
+                        Metaball metaball;
+                        [metaballValue getValue:&metaball];
                         GLKVector3 metaballPosition = metaball.position;
                         float metaballSize = metaball.size;
                         cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballSize;
@@ -242,18 +253,19 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *trian
 - (void)update
 {
     float aspect = fabsf(self.view.bounds.size.width / self.view.bounds.size.height);
-    GLKMatrix4 projectionMatrix = GLKMatrix4MakePerspective(GLKMathDegreesToRadians(65.0f), aspect, 0.1f, 100.0f);
+    _projectionMatrix = GLKMatrix4MakePerspective(GLKMathDegreesToRadians(65.0f), aspect, 0.1f, 100.0f);
     
-    GLKMatrix4 baseModelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, -8.0f);
+    _viewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, -8.0f);
     
     // Compute the model view matrix for the object rendered with ES2
-    GLKMatrix4 modelViewMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
-    modelViewMatrix = GLKMatrix4Rotate(modelViewMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
-    modelViewMatrix = GLKMatrix4Multiply(baseModelViewMatrix, modelViewMatrix);
+    _modelMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
+//    modelMatrix = GLKMatrix4Rotate(_modelMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
     
-    _normalMatrix = GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(modelViewMatrix), NULL);
+    _modelViewMatrix = GLKMatrix4Multiply(_viewMatrix, _modelMatrix);
     
-    _modelViewProjectionMatrix = GLKMatrix4Multiply(projectionMatrix, modelViewMatrix);
+    _normalMatrix = GLKMatrix3InvertAndTranspose(GLKMatrix4GetMatrix3(_modelViewMatrix), NULL);
+    
+    _modelViewProjectionMatrix = GLKMatrix4Multiply(_projectionMatrix, _modelViewMatrix);
     
     _rotation += self.timeSinceLastUpdate * 0.5f;
 }
@@ -275,24 +287,26 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *trian
     mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
     mb1.color = GLKVector3Make(0.8, 0.3, 0.4);
     mb1.size = 0.5;
+    NSValue *mb1Value = [NSValue valueWithBytes:&mb1 objCType:@encode(Metaball)];
+    
     mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
     mb2.color = GLKVector3Make(0.9, 0.4, 0.15);
     mb2.size = 0.8;
+    NSValue *mb2Value = [NSValue valueWithBytes:&mb2 objCType:@encode(Metaball)];
+    
     mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
     mb3.color = GLKVector3Make(0.45, 0.85, 0.2);
     mb3.size = 0.6;
+    NSValue *mb3Value = [NSValue valueWithBytes:&mb3 objCType:@encode(Metaball)];
+
     mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
     mb4.color = GLKVector3Make(0.65, 0.35, 0.91);
     mb4.size = 1.2;
-    Metaball metaballs[] = {mb1, mb2, mb3, mb4};
+    NSValue *mb4Value = [NSValue valueWithBytes:&mb4 objCType:@encode(Metaball)];
 
-//    GLKVector4 metaballs[] = {
-//        {1.8 * cosf(5 * _rotation), 0, 1.8 * sinf(5 * _rotation), 0.1},
-//        {1.8 * sinf(6 * _rotation), 1.8 * cosf(6 * _rotation), 0, 0.1},
-//        {0, 0, 0, 1.5}
-//    };
-    
-    int numTriangles = meshMetaballs(4, metaballs, _triangles, _grid);
+    NSArray *permanentMetaballs = @[mb1Value, mb2Value, mb3Value, mb4Value];
+
+    int numTriangles = meshMetaballs([self.metaballs arrayByAddingObjectsFromArray:permanentMetaballs], _triangles, _grid);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), _triangles, GL_STATIC_DRAW);
     
@@ -304,9 +318,30 @@ static int meshMetaballs(int numMetaballs, Metaball metaballs[], TRIANGLE *trian
 
 - (void)handleTap:(UITapGestureRecognizer *)recognizer
 {
-//    
-//    Metaball
-//    [self.points addObject:<#(id)#>
+    GLint viewport[4] = {};
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    
+    GLKVector3 origin = { 0, 0, 0 };
+    GLKVector3 projectedOrigin = GLKMathProject(origin, _modelViewMatrix, _projectionMatrix, viewport);
+
+    GLKVector2 touchPoint = GLKVector2MultiplyScalar(GLKVector2FromCGPoint([recognizer locationInView:self.view]), self.view.contentScaleFactor);
+    GLKVector2 flippedTouchPoint = GLKVector2Make(touchPoint.x, self.view.bounds.size.height * self.view.contentScaleFactor - touchPoint.y);
+    GLKVector3 windowCoords = GLKVector3Make(flippedTouchPoint.x, flippedTouchPoint.y, projectedOrigin.z);
+    
+    bool success;
+    GLKVector3 pointInSpace = GLKMathUnproject(windowCoords, _modelViewMatrix, _projectionMatrix, viewport, &success);
+    if (!success)
+    {
+        NSLog(@"WHOOPS");
+        return;
+    }
+    
+    Metaball mb;
+    mb.position = pointInSpace;
+    mb.color = GLKVector3Make((arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000));
+    mb.size = (arc4random() / (float)0x100000000);
+    NSValue *mbValue = [NSValue valueWithBytes:&mb objCType:@encode(Metaball)];
+    [self.metaballs addObject:mbValue];
 }
 
 @end
