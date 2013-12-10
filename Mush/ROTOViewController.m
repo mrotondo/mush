@@ -215,39 +215,39 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
             {
                 GRIDCELL cell;
                 
-                int lowerBackLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                int lowerBackLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
                 GRIDVERTEX lowerBackLeft = gridVertices[lowerBackLeftVertexIndex];
                 cell.v[0] = lowerBackLeft;
                 
-                int lowerBackRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
+                int lowerBackRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
                 GRIDVERTEX lowerBackRight = gridVertices[lowerBackRightVertexIndex];
                 cell.v[1] = lowerBackRight;
                 
-                int lowerFrontRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
+                int lowerFrontRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
                 GRIDVERTEX lowerFrontRight = gridVertices[lowerFrontRightVertexIndex];
                 cell.v[2] = lowerFrontRight;
                 
-                int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
+                int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
                 GRIDVERTEX lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
                 cell.v[3] = lowerFrontLeft;
 
-                int upperBackLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                int upperBackLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
                 GRIDVERTEX upperBackLeft = gridVertices[upperBackLeftVertexIndex];
                 cell.v[4] = upperBackLeft;
                 
-                int upperBackRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
+                int upperBackRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
                 GRIDVERTEX upperBackRight = gridVertices[upperBackRightVertexIndex];
                 cell.v[5] = upperBackRight;
                 
-                int upperFrontRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
+                int upperFrontRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
                 GRIDVERTEX upperFrontRight = gridVertices[upperFrontRightVertexIndex];
                 cell.v[6] = upperFrontRight;
                 
-                int upperFrontLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
+                int upperFrontLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
                 GRIDVERTEX upperFrontLeft = gridVertices[upperFrontLeftVertexIndex];
                 cell.v[7] = upperFrontLeft;
                 
-                GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerBackLeft.p), halfCellSize);
+                GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerFrontLeft.p), halfCellSize);
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
@@ -342,7 +342,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     
     // Compute the model view matrix for the object rendered with ES2
     _modelMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
-//    _modelMatrix = GLKMatrix4Rotate(_modelMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
+    _modelMatrix = GLKMatrix4Rotate(_modelMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
     
     _modelViewMatrix = GLKMatrix4Multiply(_viewMatrix, _modelMatrix);
     
