@@ -24,8 +24,9 @@ void main()
     vec4 diffuseColor = vec4(color, 1.0);
 //    vec4 diffuseColor = vec4((position.x + .5) / 2.0, (position.y + 0.5) / 2.0, (position.z + 0.5) / 2.0, 1.0);
     
-    float nDotVP = max(0.0, dot(eyeNormal, normalize(lightPosition)));
-                 
+//    float nDotVP = max(0.0, dot(eyeNormal, normalize(lightPosition)));
+    float nDotVP = abs(dot(eyeNormal, normalize(lightPosition)));
+    
     colorVarying = diffuseColor * nDotVP;
     
 //    colorVarying = vec4(eyeNormal, 1);

@@ -315,7 +315,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     
     glBindVertexArrayOES(0);
     
-    glEnable(GL_CULL_FACE);
+//    glEnable(GL_CULL_FACE);
 }
 
 - (void)tearDownGL
