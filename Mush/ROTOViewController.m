@@ -280,7 +280,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
                 gridCells[gridCellIndex] = cell;
             }
         }
-    } // lol nesting
+    }
     
     int numTriangles = 0;
     int numGridCells = numXCells * numYCells * numZCells;

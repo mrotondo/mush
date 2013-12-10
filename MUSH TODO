@@ -9,11 +9,10 @@ CLEAN
 - replace XYZ everywhere with GLKVector3
 - get rid of global vars used in e.g. meshMetaballs
 - split up meshMetaballs
-- move meshMetaballs into a module
+- move meshMetaballs etc into a module
 
 FIX
 - clarify the shader to make it obvious that it's a directional light, not a positional one
-- figure out why the metaballs look different now (weird perspective, weird intra-clipping) than they did before
 
 LOOKS
 
