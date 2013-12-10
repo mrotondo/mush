@@ -15,6 +15,17 @@ typedef struct {
 
 typedef struct {
     XYZ p;
+    double val;
+} GRIDVERTEX;
+
+typedef struct {
+    GRIDVERTEX v[8];
+    XYZ n;
+    XYZ c;
+} GRIDCELL;
+
+typedef struct {
+    XYZ p;
     XYZ n;
     XYZ c;
 } VERTEX;
@@ -22,13 +33,6 @@ typedef struct {
 typedef struct {
     VERTEX p[3];
 } TRIANGLE;
-
-typedef struct {
-    XYZ p[8];
-    XYZ n;
-    XYZ c;
-    double val[8];
-} GRIDCELL;
 
 int Polygonise(GRIDCELL grid, double isolevel, TRIANGLE *triangles);
 

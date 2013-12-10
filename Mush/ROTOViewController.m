@@ -39,6 +39,11 @@ static XYZ XYZFromGLKVector3(GLKVector3 v)
     return p;
 }
 
+static GLKVector3 GLKVector3FromXYZ(XYZ v)
+{
+    return GLKVector3Make(v.x, v.y, v.z);
+}
+
 static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 {
     return GLKVector2Make(p.x, p.y);
@@ -54,12 +59,14 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     GLKMatrix4 _modelViewProjectionMatrix;
     GLKMatrix3 _normalMatrix;
     float _rotation;
+    NSTimeInterval _timeElapsed;
     
     GLuint _vertexArray;
     GLuint _vertexBuffer;
     
     TRIANGLE *_triangles;
-    GRIDCELL *_grid;
+    GRIDVERTEX *_gridVertices;
+    GRIDCELL *_gridCells;
     Metaball *_metaballs;
 }
 @property (strong, nonatomic) EAGLContext *context;
@@ -79,11 +86,13 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     }
     
     int maxTrianglesPerCell = 2;
+    int numGridVertices = (numXCells + 1) * (numYCells + 1) * (numZCells + 1);
     int numGridCells = numXCells * numYCells * numZCells;
     int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
+    _gridVertices = malloc(numGridVertices * sizeof(GRIDVERTEX));
+    _gridCells = malloc(numGridCells * sizeof(GRIDCELL));
     _triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
-    _grid = malloc(numGridCells * sizeof(GRIDCELL));
-
+    
     GLKView *view = (GLKView *)self.view;
     view.context = self.context;
     view.drawableDepthFormat = GLKViewDrawableDepthFormat24;
@@ -130,8 +139,9 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 {    
     [self tearDownGL];
     
+    free(_gridVertices);
+    free(_gridCells);
     free(_triangles);
-    free(_grid);
     [self freeMetaballs];
     
     if ([EAGLContext currentContext] == self.context) {
@@ -155,21 +165,48 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     }
 }
 
-static float GLKVector3SquaredLength(GLKVector3 vector)
+static inline float GLKVector3SquaredLength(GLKVector3 vector)
 {
     return vector.v[0] * vector.v[0] + vector.v[1] * vector.v[1] + vector.v[2] * vector.v[2];
 }
 
-static float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition)
+static inline float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition)
 {
     float squaredDistance = GLKVector3SquaredLength(GLKVector3Subtract(point, measurementPosition));
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *grid)
+static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gridCells, GRIDVERTEX *gridVertices, NSTimeInterval time)
 {
-    GLKVector3 gridSize = GLKVector3Make(numXCells * cellDim, numYCells * cellDim, numZCells * cellDim);
+    GLKVector3 cellSize = GLKVector3Make(cellDim, cellDim, cellDim);
+    GLKVector3 halfCellSize = GLKVector3DivideScalar(cellSize, 2.0);
+    GLKVector3 gridSize = GLKVector3Multiply(GLKVector3Make(numXCells, numYCells, numZCells), cellSize);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
+    for (int x = 0; x < numXCells + 1; x++)
+    {
+        for (int y = 0; y < numYCells + 1; y++)
+        {
+            for (int z = 0; z < numZCells + 1; z++)
+            {
+                GLKVector3 vertexPosition = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
+                GRIDVERTEX vertex;
+                vertex.p = XYZFromGLKVector3(vertexPosition);
+
+                Metaball *metaball = metaballs;
+                double val = 0;
+                while (metaball != NULL)
+                {
+                    val += pointFieldStrength(metaball->position, vertexPosition) * metaball->size;
+                    metaball = metaball->next;
+                }
+                vertex.val = val;
+             
+                int gridVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                gridVertices[gridVertexIndex] = vertex;
+            }
+        }
+    }
+
     for (int x = 0; x < numXCells; x++)
     {
         for (int y = 0; y < numYCells; y++)
@@ -177,8 +214,40 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
             for (int z = 0; z < numZCells; z++)
             {
                 GRIDCELL cell;
-                GLKVector3 cellCenter = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
+                
+                int lowerBackLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                GRIDVERTEX lowerBackLeft = gridVertices[lowerBackLeftVertexIndex];
+                cell.v[0] = lowerBackLeft;
+                
+                int lowerBackRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
+                GRIDVERTEX lowerBackRight = gridVertices[lowerBackRightVertexIndex];
+                cell.v[1] = lowerBackRight;
+                
+                int lowerFrontRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
+                GRIDVERTEX lowerFrontRight = gridVertices[lowerFrontRightVertexIndex];
+                cell.v[2] = lowerFrontRight;
+                
+                int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
+                GRIDVERTEX lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
+                cell.v[3] = lowerFrontLeft;
 
+                int upperBackLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                GRIDVERTEX upperBackLeft = gridVertices[upperBackLeftVertexIndex];
+                cell.v[4] = upperBackLeft;
+                
+                int upperBackRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
+                GRIDVERTEX upperBackRight = gridVertices[upperBackRightVertexIndex];
+                cell.v[5] = upperBackRight;
+                
+                int upperFrontRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
+                GRIDVERTEX upperFrontRight = gridVertices[upperFrontRightVertexIndex];
+                cell.v[6] = upperFrontRight;
+                
+                int upperFrontLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
+                GRIDVERTEX upperFrontLeft = gridVertices[upperFrontLeftVertexIndex];
+                cell.v[7] = upperFrontLeft;
+                
+                GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerBackLeft.p), halfCellSize);
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
@@ -197,34 +266,18 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
                 color = GLKVector3DivideScalar(color, totalForce);
                 cell.c = XYZFromGLKVector3(color);
                 
-                GLKVector3 normalizedCellVertices[8] = {
-                    {-0.5, -0.5, 0.5},
-                    {0.5, -0.5, 0.5},
-                    {0.5, -0.5, -0.5},
-                    {-0.5, -0.5, -0.5},
-                    {-0.5, 0.5, 0.5},
-                    {0.5, 0.5, 0.5},
-                    {0.5, 0.5, -0.5},
-                    {-0.5, 0.5, -0.5},
-                };
-                for (int v_i = 0; v_i < 8; v_i++)
-                {
-                    GLKVector3 v = normalizedCellVertices[v_i];
-                    GLKVector3 cellVertexOffset = GLKVector3Make(v.x * cellDim, v.y * cellDim, v.z * cellDim);
-                    GLKVector3 cellVertexPos = GLKVector3Add(cellCenter, cellVertexOffset);
-                    cell.p[v_i] = XYZFromGLKVector3(cellVertexPos);
+//                for (int i = 0; i < 8; i++)
+//                {
+//                    XYZ extrudedP;
+//                    extrudedP.x = cell.v[i].p.x + normal.x;// * sin(time * cell.v[i].p.y) * 0.1;
+//                    extrudedP.y = cell.v[i].p.y + normal.y;// * sin(time * cell.v[i].p.y) * 0.1;
+//                    extrudedP.z = cell.v[i].p.z + normal.z;// * sin(time * cell.v[i].p.y) * 0.1;
+//                    cell.v[i].p = extrudedP;
+//                }
 
-                    Metaball *metaball = metaballs;
-                    double val = 0;
-                    while (metaball != NULL)
-                    {
-                        val += pointFieldStrength(metaball->position, cellVertexPos) * metaball->size;
-                        metaball = metaball->next;
-                    }
-                    cell.val[v_i] = val;
-                }
+
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
-                grid[gridCellIndex] = cell;
+                gridCells[gridCellIndex] = cell;
             }
         }
     } // lol nesting
@@ -233,7 +286,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     int numGridCells = numXCells * numYCells * numZCells;
     for (int i = 0; i < numGridCells; i++)
     {
-        numTriangles += Polygonise(grid[i], 1.0, &triangles[numTriangles]);
+        numTriangles += Polygonise(gridCells[i], 1.0, &triangles[numTriangles]);
     }
     
     return numTriangles;
@@ -289,7 +342,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     
     // Compute the model view matrix for the object rendered with ES2
     _modelMatrix = GLKMatrix4MakeTranslation(0.0f, 0.0f, 0.0f);
-//    modelMatrix = GLKMatrix4Rotate(_modelMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
+//    _modelMatrix = GLKMatrix4Rotate(_modelMatrix, 3 * _rotation, 1.0f, 1.0f, 1.0f);
     
     _modelViewMatrix = GLKMatrix4Multiply(_viewMatrix, _modelMatrix);
     
@@ -298,6 +351,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     _modelViewProjectionMatrix = GLKMatrix4Multiply(_projectionMatrix, _modelViewMatrix);
     
     _rotation += self.timeSinceLastUpdate * 0.5f;
+    _timeElapsed += self.timeSinceLastUpdate;
 }
 
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect
@@ -332,7 +386,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
 
     mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
     
-    int numTriangles = meshMetaballs(&mb1, _triangles, _grid);
+    int numTriangles = meshMetaballs(&mb1, _triangles, _gridCells, _gridVertices, _timeElapsed);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), _triangles, GL_STATIC_DRAW);
     

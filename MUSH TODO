@@ -2,17 +2,20 @@ MUSH TODO
 ---------
 
 OPTIMIZATIONS
-- share cell vertices instead of having each cell recalculate shared vertex positions/vals
 - crawling cubes (start at a cell that's on the surface then only explore neighbor cells that are also on the surface)
+- vectorize some shit??
 
 CLEAN
 - replace XYZ everywhere with GLKVector3
+- get rid of global vars used in e.g. meshMetaballs
+- split up meshMetaballs
+- move meshMetaballs into a module
 
-WHAT IT DO
-- line segments in addition to points
+FIX
+- clarify the shader to make it obvious that it's a directional light, not a positional one
+- figure out why the metaballs look different now (weird perspective, weird intra-clipping) than they did before
 
 LOOKS
-- Surface normals (do flat shading aka one normal per cell (calculated at the center))
 
 PLAY
 - a value field that starts with all 1s (a cube) and then you can add/subtract from the volume by touching and value is added/subtracted from the cells around the one your touch hit

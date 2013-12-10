@@ -20,7 +20,7 @@ uniform mat3 normalMatrix;
 void main()
 {
     vec3 eyeNormal = normalize(normalMatrix * normal);
-    vec3 lightPosition = vec3(0.0, 0.0, 1.0);
+    vec3 lightPosition = vec3(0.0, 0.0, -1.0);
     vec4 diffuseColor = vec4(color, 1.0);
 //    vec4 diffuseColor = vec4((position.x + .5) / 2.0, (position.y + 0.5) / 2.0, (position.z + 0.5) / 2.0, 1.0);
     
