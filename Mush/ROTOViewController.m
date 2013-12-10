@@ -185,14 +185,12 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
                 Metaball *metaball = metaballs;
                 while (metaball != NULL)
                 {
-                    Metaball mb = *metaball;
-                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, mb.position));
-                    float metaballSize = mb.size;
-                    float contribution = pointFieldStrength(mb.position, cellCenter) * metaballSize;
+                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, metaball->position));
+                    float contribution = pointFieldStrength(metaball->position, cellCenter) * metaball->size;
                     normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contribution), normal);
-                    color = GLKVector3Add(GLKVector3MultiplyScalar(mb.color, contribution), color);
+                    color = GLKVector3Add(GLKVector3MultiplyScalar(metaball->color, contribution), color);
                     totalForce += contribution;
-                    metaball = mb.next;
+                    metaball = metaball->next;
                 }
                 normal = GLKVector3DivideScalar(normal, totalForce);
                 cell.n = XYZFromGLKVector3(normal);
@@ -216,16 +214,14 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
                     GLKVector3 cellVertexPos = GLKVector3Add(cellCenter, cellVertexOffset);
                     cell.p[v_i] = XYZFromGLKVector3(cellVertexPos);
 
-                    cell.val[v_i] = 0;
                     Metaball *metaball = metaballs;
+                    double val = 0;
                     while (metaball != NULL)
                     {
-                        Metaball mb = *metaball;
-                        GLKVector3 metaballPosition = mb.position;
-                        float metaballSize = mb.size;
-                        cell.val[v_i] += pointFieldStrength(metaballPosition, cellVertexPos) * metaballSize;
-                        metaball = mb.next;
+                        val += pointFieldStrength(metaball->position, cellVertexPos) * metaball->size;
+                        metaball = metaball->next;
                     }
+                    cell.val[v_i] = val;
                 }
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
                 grid[gridCellIndex] = cell;

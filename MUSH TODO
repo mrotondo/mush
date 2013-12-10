@@ -17,4 +17,5 @@ LOOKS
 PLAY
 - a value field that starts with all 1s (a cube) and then you can add/subtract from the volume by touching and value is added/subtracted from the cells around the one your touch hit
   * can figure out what cell was touched by having a render buffer whose pixels store the xyz of the cell that generated that face
-- draw lines
+- draw lines in space and have them generate surfaces as well as points
+- create "negative" metaballs, which subtract force in the same way that normal ones contribute force
