@@ -183,6 +183,24 @@ static inline float pointFieldStrength(GLKVector3 point, GLKVector3 measurementP
 
 static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCells, Metaball* metaballs, Triangle *triangles, GridCell *gridCells, GridVertex *gridVertices, NSTimeInterval time)
 {
+    int numMetaballs = 0;
+    Metaball *metaball = metaballs;
+    while (metaball != NULL)
+    {
+        ++numMetaballs;
+        metaball = metaball->next;
+    }
+    Metaball mbArray[numMetaballs];
+    int mbIndex = 0;
+    metaball = metaballs;
+    while (metaball != NULL)
+    {
+        mbArray[mbIndex++] = *metaball;
+        metaball = metaball->next;
+    }
+
+    NSLog(@"Num Metaballs: %d", numMetaballs);
+    
     GLKVector3 cellSize = GLKVector3Make(cellDim, cellDim, cellDim);
     GLKVector3 halfCellSize = GLKVector3DivideScalar(cellSize, 2.0);
     GLKVector3 gridSize = GLKVector3Multiply(GLKVector3Make(numXCells, numYCells, numZCells), cellSize);
@@ -197,12 +215,10 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 GridVertex vertex;
                 vertex.p = XYZFromGLKVector3(vertexPosition);
 
-                Metaball *metaball = metaballs;
                 double val = 0;
-                while (metaball != NULL)
+                for (int i = 0; i < numMetaballs; i++)
                 {
-                    val += pointFieldStrength(metaball->position, vertexPosition) * metaball->size;
-                    metaball = metaball->next;
+                    val += pointFieldStrength(mbArray[i].position, vertexPosition) * mbArray[i].size;
                 }
                 vertex.val = val;
              
@@ -242,15 +258,13 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
-                Metaball *metaball = metaballs;
-                while (metaball != NULL)
+                for (int i = 0; i < numMetaballs; i++)
                 {
-                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, metaball->position));
-                    float contribution = pointFieldStrength(metaball->position, cellCenter) * metaball->size;
+                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, mbArray[i].position));
+                    float contribution = pointFieldStrength(mbArray[i].position, cellCenter) * mbArray[i].size;
                     normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contribution), normal);
-                    color = GLKVector3Add(GLKVector3MultiplyScalar(metaball->color, contribution), color);
+                    color = GLKVector3Add(GLKVector3MultiplyScalar(mbArray[i].color, contribution), color);
                     totalForce += contribution;
-                    metaball = metaball->next;
                 }
                 normal = GLKVector3DivideScalar(normal, totalForce);
                 cell.n = XYZFromGLKVector3(normal);
