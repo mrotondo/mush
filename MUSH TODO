@@ -4,17 +4,20 @@ MUSH TODO
 OPTIMIZATIONS
 - crawling cubes (start at a cell that's on the surface then only explore neighbor cells that are also on the surface)
 - vectorize some shit??
+- look at current assembly output
+- collapse linked list (of metaballs) into an array of values, then do for loops instead of while loops (consider using pointer arithmetic instead of indexing), one loop for each step (difference, squared length, inversion) to see if it auto-vectorizes or as a step towards manual vectorization
 
 CLEAN
-- replace XYZ everywhere with GLKVector3
-- get rid of global vars used in e.g. meshMetaballs
 - split up meshMetaballs
 - move meshMetaballs etc into a module
+- put on github
 
 FIX
 - clarify the shader to make it obvious that it's a directional light, not a positional one
 
 LOOKS
+- add specular highlights
+- turn on (animated) vertex offset again to se what it looks like with backfaces rendered & lit
 
 PLAY
 - a value field that starts with all 1s (a cube) and then you can add/subtract from the volume by touching and value is added/subtracted from the cells around the one your touch hit

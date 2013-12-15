@@ -219,39 +219,25 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
             for (int z = 0; z < numZCells; z++)
             {
                 GridCell cell;
-                
-                int lowerBackLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
-                GridVertex lowerBackLeft = gridVertices[lowerBackLeftVertexIndex];
-                cell.v[0] = lowerBackLeft;
-                
-                int lowerBackRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
-                GridVertex lowerBackRight = gridVertices[lowerBackRightVertexIndex];
-                cell.v[1] = lowerBackRight;
-                
-                int lowerFrontRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
-                GridVertex lowerFrontRight = gridVertices[lowerFrontRightVertexIndex];
-                cell.v[2] = lowerFrontRight;
-                
+                int offsets[8][3] = {
+                    {0, 0, 1},
+                    {1, 0, 1},
+                    {1, 0, 0},
+                    {0, 0, 0},
+                    {0, 1, 1},
+                    {1, 1, 1},
+                    {1, 1, 0},
+                    {0, 1, 0}
+                };
+                for (int i = 0; i < 8; i++)
+                {
+                    int vertexIndex = (y + offsets[i][1]) * (numXCells + 1) * (numZCells + 1) + (z + offsets[i][2]) * (numXCells + 1) + (x + offsets[i][0]);
+                    GridVertex vertex = gridVertices[vertexIndex];
+                    cell.v[i] = vertex;
+                }
+
                 int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
                 GridVertex lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
-                cell.v[3] = lowerFrontLeft;
-
-                int upperBackLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
-                GridVertex upperBackLeft = gridVertices[upperBackLeftVertexIndex];
-                cell.v[4] = upperBackLeft;
-                
-                int upperBackRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
-                GridVertex upperBackRight = gridVertices[upperBackRightVertexIndex];
-                cell.v[5] = upperBackRight;
-                
-                int upperFrontRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
-                GridVertex upperFrontRight = gridVertices[upperFrontRightVertexIndex];
-                cell.v[6] = upperFrontRight;
-                
-                int upperFrontLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
-                GridVertex upperFrontLeft = gridVertices[upperFrontLeftVertexIndex];
-                cell.v[7] = upperFrontLeft;
-                
                 GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerFrontLeft.p), halfCellSize);
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
@@ -279,7 +265,6 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 //                    extrudedP.z = cell.v[i].p.z + normal.z;// * sin(time * cell.v[i].p.y) * 0.1;
 //                    cell.v[i].p = extrudedP;
 //                }
-
 
                 int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
                 gridCells[gridCellIndex] = cell;
