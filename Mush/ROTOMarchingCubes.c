@@ -336,7 +336,7 @@ static XYZ VertexInterp(double isolevel, XYZ p1, XYZ p2, double valp1, double va
  0 will be returned if the grid cell is either totally above
  of totally below the isolevel.
  */
-int Polygonise(GRIDCELL cell, double isolevel, TRIANGLE *triangles)
+int Polygonise(GridCell cell, double isolevel, Triangle *triangles)
 {
     int i,ntriang;
     int cubeindex;
@@ -400,17 +400,17 @@ int Polygonise(GRIDCELL cell, double isolevel, TRIANGLE *triangles)
     /* Create the triangle */
     ntriang = 0;
     for (i=0;triTable[cubeindex][i]!=-1;i+=3) {
-        triangles[ntriang].p[0].p = vertlist[triTable[cubeindex][i  ]];
-        triangles[ntriang].p[1].p = vertlist[triTable[cubeindex][i+1]];
-        triangles[ntriang].p[2].p = vertlist[triTable[cubeindex][i+2]];
+        triangles[ntriang].v[0].p = vertlist[triTable[cubeindex][i  ]];
+        triangles[ntriang].v[1].p = vertlist[triTable[cubeindex][i+1]];
+        triangles[ntriang].v[2].p = vertlist[triTable[cubeindex][i+2]];
 
-        triangles[ntriang].p[0].n = cell.n;
-        triangles[ntriang].p[1].n = cell.n;
-        triangles[ntriang].p[2].n = cell.n;
+        triangles[ntriang].v[0].n = cell.n;
+        triangles[ntriang].v[1].n = cell.n;
+        triangles[ntriang].v[2].n = cell.n;
         
-        triangles[ntriang].p[0].c = cell.c;
-        triangles[ntriang].p[1].c = cell.c;
-        triangles[ntriang].p[2].c = cell.c;
+        triangles[ntriang].v[0].c = cell.c;
+        triangles[ntriang].v[1].c = cell.c;
+        triangles[ntriang].v[2].c = cell.c;
         
         ntriang++;
     }

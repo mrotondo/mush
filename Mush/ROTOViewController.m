@@ -21,11 +21,6 @@ enum
     NUM_ATTRIBUTES
 };
 
-static float cellDim = 0.3;
-static int numXCells = 25;
-static int numYCells = 25;
-static int numZCells = 25;
-
 typedef struct _Metaball{
     GLKVector3 position;
     GLKVector3 color;
@@ -64,10 +59,15 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     GLuint _vertexArray;
     GLuint _vertexBuffer;
     
-    TRIANGLE *_triangles;
-    GRIDVERTEX *_gridVertices;
-    GRIDCELL *_gridCells;
+    Triangle *_triangles;
+    GridVertex *_gridVertices;
+    GridCell *_gridCells;
     Metaball *_metaballs;
+
+    float _cellDim;
+    int _numXCells;
+    int _numYCells;
+    int _numZCells;
 }
 @property (strong, nonatomic) EAGLContext *context;
 
@@ -85,13 +85,18 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
         NSLog(@"Failed to create ES context");
     }
     
+    _cellDim = 0.3;
+    _numXCells = 25;
+    _numYCells = 25;
+    _numZCells = 25;
+    
     int maxTrianglesPerCell = 2;
-    int numGridVertices = (numXCells + 1) * (numYCells + 1) * (numZCells + 1);
-    int numGridCells = numXCells * numYCells * numZCells;
+    int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
+    int numGridCells = _numXCells * _numYCells * _numZCells;
     int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
-    _gridVertices = malloc(numGridVertices * sizeof(GRIDVERTEX));
-    _gridCells = malloc(numGridCells * sizeof(GRIDCELL));
-    _triangles = malloc(maxTotalTriangles * sizeof(TRIANGLE));
+    _gridVertices = malloc(numGridVertices * sizeof(GridVertex));
+    _gridCells = malloc(numGridCells * sizeof(GridCell));
+    _triangles = malloc(maxTotalTriangles * sizeof(Triangle));
     
     GLKView *view = (GLKView *)self.view;
     view.context = self.context;
@@ -176,7 +181,7 @@ static inline float pointFieldStrength(GLKVector3 point, GLKVector3 measurementP
     return 1.0 / squaredDistance;
 }
 
-static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gridCells, GRIDVERTEX *gridVertices, NSTimeInterval time)
+static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCells, Metaball* metaballs, Triangle *triangles, GridCell *gridCells, GridVertex *gridVertices, NSTimeInterval time)
 {
     GLKVector3 cellSize = GLKVector3Make(cellDim, cellDim, cellDim);
     GLKVector3 halfCellSize = GLKVector3DivideScalar(cellSize, 2.0);
@@ -189,7 +194,7 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
             for (int z = 0; z < numZCells + 1; z++)
             {
                 GLKVector3 vertexPosition = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
-                GRIDVERTEX vertex;
+                GridVertex vertex;
                 vertex.p = XYZFromGLKVector3(vertexPosition);
 
                 Metaball *metaball = metaballs;
@@ -213,38 +218,38 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
         {
             for (int z = 0; z < numZCells; z++)
             {
-                GRIDCELL cell;
+                GridCell cell;
                 
                 int lowerBackLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
-                GRIDVERTEX lowerBackLeft = gridVertices[lowerBackLeftVertexIndex];
+                GridVertex lowerBackLeft = gridVertices[lowerBackLeftVertexIndex];
                 cell.v[0] = lowerBackLeft;
                 
                 int lowerBackRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
-                GRIDVERTEX lowerBackRight = gridVertices[lowerBackRightVertexIndex];
+                GridVertex lowerBackRight = gridVertices[lowerBackRightVertexIndex];
                 cell.v[1] = lowerBackRight;
                 
                 int lowerFrontRightVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
-                GRIDVERTEX lowerFrontRight = gridVertices[lowerFrontRightVertexIndex];
+                GridVertex lowerFrontRight = gridVertices[lowerFrontRightVertexIndex];
                 cell.v[2] = lowerFrontRight;
                 
                 int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
-                GRIDVERTEX lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
+                GridVertex lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
                 cell.v[3] = lowerFrontLeft;
 
                 int upperBackLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + x;
-                GRIDVERTEX upperBackLeft = gridVertices[upperBackLeftVertexIndex];
+                GridVertex upperBackLeft = gridVertices[upperBackLeftVertexIndex];
                 cell.v[4] = upperBackLeft;
                 
                 int upperBackRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + (z + 1) * (numXCells + 1) + (x + 1);
-                GRIDVERTEX upperBackRight = gridVertices[upperBackRightVertexIndex];
+                GridVertex upperBackRight = gridVertices[upperBackRightVertexIndex];
                 cell.v[5] = upperBackRight;
                 
                 int upperFrontRightVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + (x + 1);
-                GRIDVERTEX upperFrontRight = gridVertices[upperFrontRightVertexIndex];
+                GridVertex upperFrontRight = gridVertices[upperFrontRightVertexIndex];
                 cell.v[6] = upperFrontRight;
                 
                 int upperFrontLeftVertexIndex = (y + 1) * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
-                GRIDVERTEX upperFrontLeft = gridVertices[upperFrontLeftVertexIndex];
+                GridVertex upperFrontLeft = gridVertices[upperFrontLeftVertexIndex];
                 cell.v[7] = upperFrontLeft;
                 
                 GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerFrontLeft.p), halfCellSize);
@@ -307,11 +312,11 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     
     glEnableVertexAttribArray(GLKVertexAttribPosition);
-    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(0));
+    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(0));
     glEnableVertexAttribArray(GLKVertexAttribNormal);
-    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(sizeof(XYZ)));
+    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ)));
     glEnableVertexAttribArray(GLKVertexAttribColor);
-    glVertexAttribPointer(GLKVertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(VERTEX), BUFFER_OFFSET(sizeof(XYZ) * 2));
+    glVertexAttribPointer(GLKVertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ) * 2));
     
     glBindVertexArrayOES(0);
     
@@ -386,9 +391,9 @@ static int meshMetaballs(Metaball* metaballs, TRIANGLE *triangles, GRIDCELL *gri
 
     mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
     
-    int numTriangles = meshMetaballs(&mb1, _triangles, _gridCells, _gridVertices, _timeElapsed);
+    int numTriangles = meshMetaballs(_cellDim, _numXCells, _numYCells, _numZCells, &mb1, _triangles, _gridCells, _gridVertices, _timeElapsed);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(TRIANGLE), _triangles, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(Triangle), _triangles, GL_STATIC_DRAW);
     
     glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
 //    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
