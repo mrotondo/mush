@@ -104,8 +104,11 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 
     [self setupGL];
     
-    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
-    [self.view addGestureRecognizer:tapRecognizer];
+//    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
+//    [self.view addGestureRecognizer:tapRecognizer];
+
+    UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
+    [self.view addGestureRecognizer:panRecognizer];
 }
 
 - (void)addMetaball:(Metaball)mb
@@ -170,15 +173,33 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     }
 }
 
-static inline float GLKVector3SquaredLength(GLKVector3 vector)
+static inline void calcPointFieldStrengths(Metaball *metaballs, int numMetaballs, GLKVector3 measurementPosition, float *outContributions, Metaball *outContributingMetaballs, int *outNumContributingMetaballs)
 {
-    return vector.v[0] * vector.v[0] + vector.v[1] * vector.v[1] + vector.v[2] * vector.v[2];
+    int numContributingMetaballs = 0;
+    float contribution = 0.0;
+    for (int i = 0; i < numMetaballs; i++)
+    {
+        float r = GLKVector3Distance(metaballs[i].position, measurementPosition);
+        if (r < 1.0)
+        {
+            // Thanks Ryan Geiss & Ken Perlin! http://www.geisswerks.com/ryan/BLOBS/blobs.html
+            contribution = r * r * r * (r * (r * 6 - 15) + 10);
+            outContributions[numContributingMetaballs] = (1.0 - contribution) * metaballs[i].size;
+            outContributingMetaballs[numContributingMetaballs] = metaballs[i];
+            ++numContributingMetaballs;
+        }
+    }
+    *outNumContributingMetaballs = numContributingMetaballs;
 }
 
-static inline float pointFieldStrength(GLKVector3 point, GLKVector3 measurementPosition)
+static /*inline*/ float sumFloats(float *vals, int numVals)
 {
-    float squaredDistance = GLKVector3SquaredLength(GLKVector3Subtract(point, measurementPosition));
-    return 1.0 / squaredDistance;
+    double val = 0;
+    for (int i = 0; i < numVals; i++)
+    {
+        val += vals[i];
+    }
+    return val;
 }
 
 static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCells, Metaball* metaballs, Triangle *triangles, GridCell *gridCells, GridVertex *gridVertices, NSTimeInterval time)
@@ -201,6 +222,11 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 
     NSLog(@"Num Metaballs: %d", numMetaballs);
     
+    float threshold = 0.25;
+    
+    float *contributions = (float *)malloc(numMetaballs * sizeof(float));
+    Metaball *contributingMetaballs = (Metaball *)malloc(numMetaballs * sizeof(Metaball));
+    
     GLKVector3 cellSize = GLKVector3Make(cellDim, cellDim, cellDim);
     GLKVector3 halfCellSize = GLKVector3DivideScalar(cellSize, 2.0);
     GLKVector3 gridSize = GLKVector3Multiply(GLKVector3Make(numXCells, numYCells, numZCells), cellSize);
@@ -215,12 +241,9 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 GridVertex vertex;
                 vertex.p = XYZFromGLKVector3(vertexPosition);
 
-                double val = 0;
-                for (int i = 0; i < numMetaballs; i++)
-                {
-                    val += pointFieldStrength(mbArray[i].position, vertexPosition) * mbArray[i].size;
-                }
-                vertex.val = val;
+                int numContributingMetaballs = 0;
+                calcPointFieldStrengths(mbArray, numMetaballs, vertexPosition, contributions, contributingMetaballs, &numContributingMetaballs);
+                vertex.val = sumFloats(contributions, numContributingMetaballs);
              
                 int gridVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
                 gridVertices[gridVertexIndex] = vertex;
@@ -258,19 +281,22 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
-                for (int i = 0; i < numMetaballs; i++)
+                int numContributingMetaballs = 0;
+                calcPointFieldStrengths(mbArray, numMetaballs, cellCenter, contributions, contributingMetaballs, &numContributingMetaballs);
+                if (numContributingMetaballs > 0)
                 {
-                    GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, mbArray[i].position));
-                    float contribution = pointFieldStrength(mbArray[i].position, cellCenter) * mbArray[i].size;
-                    normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contribution), normal);
-                    color = GLKVector3Add(GLKVector3MultiplyScalar(mbArray[i].color, contribution), color);
-                    totalForce += contribution;
+                    for (int i = 0; i < numContributingMetaballs; i++)
+                    {
+                        GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, contributingMetaballs[i].position));
+                        normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contributions[i]), normal);
+                        color = GLKVector3Add(GLKVector3MultiplyScalar(contributingMetaballs[i].color, contributions[i]), color);
+                        totalForce += contributions[i];
+                    }
+                    normal = GLKVector3DivideScalar(normal, totalForce);
+                    cell.n = XYZFromGLKVector3(normal);
+                    color = GLKVector3DivideScalar(color, totalForce);
+                    cell.c = XYZFromGLKVector3(color);
                 }
-                normal = GLKVector3DivideScalar(normal, totalForce);
-                cell.n = XYZFromGLKVector3(normal);
-                color = GLKVector3DivideScalar(color, totalForce);
-                cell.c = XYZFromGLKVector3(color);
-                
 //                for (int i = 0; i < 8; i++)
 //                {
 //                    XYZ extrudedP;
@@ -290,8 +316,11 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     int numGridCells = numXCells * numYCells * numZCells;
     for (int i = 0; i < numGridCells; i++)
     {
-        numTriangles += Polygonise(gridCells[i], 1.0, &triangles[numTriangles]);
+        numTriangles += Polygonise(gridCells[i], threshold, &triangles[numTriangles]);
     }
+    
+    free(contributions);
+    free(contributingMetaballs);
     
     return numTriangles;
 }
@@ -373,20 +402,20 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     
     Metaball mb1, mb2, mb3, mb4;
     mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
-    mb1.color = GLKVector3Make(0.8, 0.3, 0.4);
+    mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
     mb1.size = 0.5;
     
     mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
-    mb2.color = GLKVector3Make(0.9, 0.4, 0.15);
-    mb2.size = 0.8;
+    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
+    mb2.size = 1;
     
     mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
-    mb3.color = GLKVector3Make(0.45, 0.85, 0.2);
-    mb3.size = 0.6;
+    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
+    mb3.size = 2;
 
     mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
-    mb4.color = GLKVector3Make(0.65, 0.35, 0.91);
-    mb4.size = 1.2;
+    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
+    mb4.size = 3;
 
     mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
     
@@ -400,15 +429,14 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 
 #pragma mark - Touch Handling
 
-- (void)handleTap:(UITapGestureRecognizer *)recognizer
+- (void)addMetaballAtTouchPoint:(GLKVector2)touchPoint
 {
     GLint viewport[4] = {};
     glGetIntegerv(GL_VIEWPORT, viewport);
     
     GLKVector3 origin = { 0, 0, 0 };
     GLKVector3 projectedOrigin = GLKMathProject(origin, _modelViewMatrix, _projectionMatrix, viewport);
-
-    GLKVector2 touchPoint = GLKVector2MultiplyScalar(GLKVector2FromCGPoint([recognizer locationInView:self.view]), self.view.contentScaleFactor);
+    
     GLKVector2 flippedTouchPoint = GLKVector2Make(touchPoint.x, self.view.bounds.size.height * self.view.contentScaleFactor - touchPoint.y);
     GLKVector3 windowCoords = GLKVector3Make(flippedTouchPoint.x, flippedTouchPoint.y, projectedOrigin.z);
     
@@ -423,8 +451,32 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     Metaball mb;
     mb.position = pointInSpace;
     mb.color = GLKVector3Make((arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000));
-    mb.size = (arc4random() / (float)0x100000000);
+    mb.size = 0.2 + 0.8 * (arc4random() / (float)0x100000000);
     [self addMetaball:mb];
+}
+
+- (void)handleTap:(UITapGestureRecognizer *)recognizer
+{
+    GLKVector2 touchPoint = GLKVector2MultiplyScalar(GLKVector2FromCGPoint([recognizer locationInView:self.view]), self.view.contentScaleFactor);
+    switch (recognizer.state) {
+        case UIGestureRecognizerStateRecognized:
+            [self addMetaballAtTouchPoint:touchPoint];
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)handlePan:(UIPanGestureRecognizer *)recognizer
+{
+    GLKVector2 touchPoint = GLKVector2MultiplyScalar(GLKVector2FromCGPoint([recognizer locationInView:self.view]), self.view.contentScaleFactor);
+    switch (recognizer.state) {
+        case UIGestureRecognizerStateChanged:
+            [self addMetaballAtTouchPoint:touchPoint];
+            break;
+        default:
+            break;
+    }
 }
 
 @end
