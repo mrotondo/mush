@@ -179,9 +179,13 @@ static inline void calcPointFieldStrengths(Metaball *metaballs, int numMetaballs
     float contribution = 0.0;
     for (int i = 0; i < numMetaballs; i++)
     {
-        float r = GLKVector3Distance(metaballs[i].position, measurementPosition);
-        if (r < 1.0)
+        float r = GLKVector3Distance(metaballs[i].position, measurementPosition) - 1.0;
+
+        // Since distance is positive and we subtracted 1 from it, we know (r + 1) is positive, and we only want values < 1.0, so check the sign bit of r
+        if (*((int *)(void *)&r) & 0x80000000)
         {
+            r += 1.0;
+            
             // Thanks Ryan Geiss & Ken Perlin! http://www.geisswerks.com/ryan/BLOBS/blobs.html
             contribution = r * r * r * (r * (r * 6 - 15) + 10);
             outContributions[numContributingMetaballs] = (1.0 - contribution) * metaballs[i].size;
