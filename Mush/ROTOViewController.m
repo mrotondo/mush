@@ -173,16 +173,23 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     }
 }
 
-static inline void calcPointFieldStrengths(Metaball *metaballs, int numMetaballs, GLKVector3 measurementPosition, float *outContributions, Metaball *outContributingMetaballs, int *outNumContributingMetaballs)
+static float GLKVector3SquaredLength(GLKVector3 v)
+{
+    return v.v[0] * v.v[0] + v.v[1] * v.v[1] + v.v[2] * v.v[2];
+}
+
+static /*inline*/ void calcPointFieldStrengths(Metaball *metaballs, int numMetaballs, GLKVector3 measurementPosition, float *outContributions, Metaball *outContributingMetaballs, int *outNumContributingMetaballs)
 {
     int numContributingMetaballs = 0;
     float contribution = 0.0;
     for (int i = 0; i < numMetaballs; i++)
     {
-        float r = GLKVector3Distance(metaballs[i].position, measurementPosition) - 1.0;
-
+        GLKVector3 vector = GLKVector3Subtract(measurementPosition, metaballs[i].position);
+//        float r = GLKVector3Length(vector) - 1.0;
+        float r = GLKVector3SquaredLength(vector) - 1.0;
+        
         // Since distance is positive and we subtracted 1 from it, we know (r + 1) is positive, and we only want values < 1.0, so check the sign bit of r
-        if (*((int *)(void *)&r) & 0x80000000)
+        if (*((int *)(void *)&r) >> 31)
         {
             r += 1.0;
             
@@ -224,7 +231,10 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         metaball = metaball->next;
     }
 
-    NSLog(@"Num Metaballs: %d", numMetaballs);
+    if (numMetaballs % 10 == 0)
+    {
+        NSLog(@"Num Metaballs: %d", numMetaballs);
+    }
     
     float threshold = 0.25;
     
