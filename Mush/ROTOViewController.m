@@ -85,10 +85,10 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
         NSLog(@"Failed to create ES context");
     }
     
-    _cellDim = 0.3;
-    _numXCells = 25;
-    _numYCells = 25;
-    _numZCells = 25;
+    _cellDim = 0.1;
+    _numXCells = 75;
+    _numYCells = 75;
+    _numZCells = 75;
     
     int maxTrianglesPerCell = 2;
     int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
@@ -109,6 +109,15 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 
     UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.view addGestureRecognizer:panRecognizer];
+    
+//    for (int i = 0; i < 300; i++)
+//    {
+//        Metaball mb;
+//        mb.position = GLKVector3Make(-2 + 4 * (arc4random() / (float)0x100000000), -2 + 4 * (arc4random() / (float)0x100000000), -2 + 4 * (arc4random() / (float)0x100000000));
+//        mb.color = GLKVector3Make((arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000), (arc4random() / (float)0x100000000));
+//        mb.size = 0.5 + (arc4random() / (float)0x100000000);
+//        [self addMetaball:mb];
+//    }
 }
 
 - (void)addMetaball:(Metaball)mb
@@ -173,10 +182,21 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     }
 }
 
-static float GLKVector3SquaredLength(GLKVector3 v)
-{
-    return v.v[0] * v.v[0] + v.v[1] * v.v[1] + v.v[2] * v.v[2];
-}
+//static float GLKVector3SquaredLength(GLKVector3 v)
+//{
+//    return v.v[0] * v.v[0] + v.v[1] * v.v[1] + v.v[2] * v.v[2];
+//}
+
+//static float GLKVector3ManhattanLength(GLKVector3 v)
+//{
+////    return sumFloats(v.v, 3);
+//    return 13.5 * (v.v[0] + v.v[1] + v.v[2]);
+//}
+
+//static float GLKVector3ConstantLength(GLKVector3 v)
+//{
+//    return 0.5;
+//}
 
 static /*inline*/ void calcPointFieldStrengths(Metaball *metaballs, int numMetaballs, GLKVector3 measurementPosition, float *outContributions, Metaball *outContributingMetaballs, int *outNumContributingMetaballs)
 {
@@ -185,17 +205,16 @@ static /*inline*/ void calcPointFieldStrengths(Metaball *metaballs, int numMetab
     for (int i = 0; i < numMetaballs; i++)
     {
         GLKVector3 vector = GLKVector3Subtract(measurementPosition, metaballs[i].position);
-//        float r = GLKVector3Length(vector) - 1.0;
-        float r = GLKVector3SquaredLength(vector) - 1.0;
+        float r = GLKVector3Length(vector);
+//        float r = GLKVector3SquaredLength(vector);
+//        float r = GLKVector3ManhattanLength(vector);
+//        float r = GLKVector3ConstantLength(vector);
         
-        // Since distance is positive and we subtracted 1 from it, we know (r + 1) is positive, and we only want values < 1.0, so check the sign bit of r
-        if (*((int *)(void *)&r) >> 31)
+        if (r < 1.0)
         {
-            r += 1.0;
-            
             // Thanks Ryan Geiss & Ken Perlin! http://www.geisswerks.com/ryan/BLOBS/blobs.html
             contribution = r * r * r * (r * (r * 6 - 15) + 10);
-            outContributions[numContributingMetaballs] = (1.0 - contribution) * metaballs[i].size;
+            outContributions[numContributingMetaballs] = (1.0 - contribution);// * metaballs[i].size;
             outContributingMetaballs[numContributingMetaballs] = metaballs[i];
             ++numContributingMetaballs;
         }

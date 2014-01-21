@@ -14,6 +14,7 @@ CLEAN
 
 FIX
 - clarify the shader to make it obvious that it's a directional light, not a positional one
+- visual fuckery introduced when switched to squared length
 
 LOOKS
 - add specular highlights
