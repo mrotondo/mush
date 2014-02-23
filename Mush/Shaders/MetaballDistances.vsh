@@ -6,7 +6,7 @@
 //  Copyright (c) 2013 Rototyping. All rights reserved.
 //
 
-attribute lowp vec4 position;
+attribute highp vec4 position;
 attribute lowp vec2 texCoords;
 
 uniform lowp mat4 modelViewProjectionMatrix;
