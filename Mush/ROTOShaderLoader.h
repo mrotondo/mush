@@ -19,7 +19,10 @@ GLint uniforms[NUM_UNIFORMS];
 GLint metaballVertexAttribute;
 GLint metaballTexCoordAttribute;
 GLint metaballMVPMatrixUniform;
-GLint metaballDataTextureUniform;
+GLint metaballCellPositionsTextureUniform;
+GLint metaballMetaballPositionsTextureUniform;
+GLint metaballMetaballPositionsTextureSizeUniform;
+GLint metaballNumMetaballsUniform;
 
 @interface ROTOShaderLoader : NSObject
 

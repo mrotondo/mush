@@ -8,11 +8,15 @@
 
 varying lowp vec2 vTexCoords;
 
-uniform sampler2D dataTexture;
+uniform sampler2D cellPositionsTexture;
+uniform sampler2D metaballPositionsTexture;
+uniform lowp vec2 metaballPositionsTextureSize;
+uniform lowp float numMetaballs;
 
 void main()
 {
-    lowp vec4 texValue = texture2D(dataTexture, vTexCoords);
+    lowp vec4 cellPosition = texture2D(cellPositionsTexture, vTexCoords);
+//    lowp vec4 texValue = texture2D(dataTexture, vTexCoords);
     
-    gl_FragColor = vec4(vec3(texValue.x), 1.0);
+    gl_FragColor = vec4(cellPosition.xyz, 1.0);
 }

@@ -30,8 +30,6 @@
 		D586F072184DA48B00FE89BD /* MushTests.m in Sources */ = {isa = PBXBuildFile; fileRef = D586F071184DA48B00FE89BD /* MushTests.m */; };
 		D591761818551E35007DCD6A /* ROTOShaderLoader.m in Sources */ = {isa = PBXBuildFile; fileRef = D591761718551E35007DCD6A /* ROTOShaderLoader.m */; };
 		D5D004BD184F015F005D791B /* ROTOMarchingCubes.c in Sources */ = {isa = PBXBuildFile; fileRef = D5D004BC184F015F005D791B /* ROTOMarchingCubes.c */; };
-		D5FE41C818B205A800B90B9A /* MetaballDistances.fsh in Sources */ = {isa = PBXBuildFile; fileRef = D5FE41C618B205A800B90B9A /* MetaballDistances.fsh */; };
-		D5FE41C918B205A800B90B9A /* MetaballDistances.vsh in Sources */ = {isa = PBXBuildFile; fileRef = D5FE41C718B205A800B90B9A /* MetaballDistances.vsh */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -294,9 +292,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D5FE41C918B205A800B90B9A /* MetaballDistances.vsh in Sources */,
 				D586F050184DA48B00FE89BD /* ROTOAppDelegate.m in Sources */,
-				D5FE41C818B205A800B90B9A /* MetaballDistances.fsh in Sources */,
 				D586F05D184DA48B00FE89BD /* ROTOViewController.m in Sources */,
 				D586F04C184DA48B00FE89BD /* main.m in Sources */,
 				D5D004BD184F015F005D791B /* ROTOMarchingCubes.c in Sources */,

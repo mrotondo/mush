@@ -139,7 +139,10 @@
     
     // Get uniform locations.
     metaballMVPMatrixUniform = glGetUniformLocation(program, "modelViewProjectionMatrix");
-    metaballDataTextureUniform = glGetUniformLocation(program, "dataTexture");
+    metaballCellPositionsTextureUniform = glGetUniformLocation(program, "cellPositionsTexture");
+    metaballMetaballPositionsTextureUniform = glGetUniformLocation(program, "metaballPositionsTexture");
+    metaballMetaballPositionsTextureSizeUniform = glGetUniformLocation(program, "metaballPositionsTextureSize");
+    metaballNumMetaballsUniform = glGetUniformLocation(program, "numMetaballs");
     
     // Release vertex and fragment shaders.
     if (vertShader) {
