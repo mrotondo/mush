@@ -3,9 +3,8 @@ MUSH TODO
 
 OPTIMIZATIONS
 - crawling cubes (start at a cell that's on the surface then only explore neighbor cells that are also on the surface)
-- vectorize some shit??
-- look at current assembly output
 - collapse linked list (of metaballs) into an array of values, then do for loops instead of while loops (consider using pointer arithmetic instead of indexing), one loop for each step (difference, squared length, inversion) to see if it auto-vectorizes or as a step towards manual vectorization
+- look into using glcvtexturecache or mapbuffer instead of gltexsubimage2d
 
 CLEAN
 - split up meshMetaballs

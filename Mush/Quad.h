@@ -12,10 +12,10 @@
 #define QuadNumVertices 4
 #define QuadNumIndices 6
 static const EntityVertex quadVertices[QuadNumVertices] = {
-    {{-0.5f,  -0.5f,  0.0f},  {0.0f, 0.0f, 1.0f},  {0.0, 0.0}},
-    {{0.5f,  -0.5f,  0.0f},   {0.0f, 0.0f, 1.0f},  {1.0, 0.0}},
-    {{0.5f,   0.5f,  0.0f},   {0.0f, 0.0f, 1.0f},  {1.0, 1.0}},
-    {{-0.5f,   0.5f,  0.0f},  {0.0f, 0.0f, 1.0f},  {0.0, 1.0}},
+    {{0.0f,  0.0f,  0.0f},  {0.0f, 0.0f, 1.0f},  {0.0, 0.0}},
+    {{1.0f,  0.0f,  0.0f},   {0.0f, 0.0f, 1.0f},  {1.0, 0.0}},
+    {{1.0f,   1.0f,  0.0f},   {0.0f, 0.0f, 1.0f},  {1.0, 1.0}},
+    {{0.0f,   1.0f,  0.0f},  {0.0f, 0.0f, 1.0f},  {0.0, 1.0}},
 };
 
 static const unsigned int quadIndices[QuadNumIndices] =
