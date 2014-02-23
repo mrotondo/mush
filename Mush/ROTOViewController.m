@@ -9,6 +9,7 @@
 #import "ROTOViewController.h"
 #import "ROTOMarchingCubes.h"
 #import "ROTOShaderLoader.h"
+#import "Quad.h"
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -46,6 +47,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 
 @interface ROTOViewController () {
     GLuint _program;
+    GLuint _metaballProgram;
     
     GLKMatrix4 _modelMatrix;
     GLKMatrix4 _viewMatrix;
@@ -58,6 +60,8 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     GLuint _vertexArray;
     GLuint _vertexBuffer;
+    
+    GLuint _dataTexture;
     
     Triangle *_triangles;
     GridVertex *_gridVertices;
@@ -79,7 +83,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 {
     [super viewDidLoad];
     
-    self.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
+    self.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
     
     if (!self.context) {
         NSLog(@"Failed to create ES context");
@@ -358,30 +362,69 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     return numTriangles;
 }
 
+- (void)drawQuadWithViewMatrix:(GLKMatrix4)viewMatrix projectionMatrix:(GLKMatrix4)projectionMatrix texture:(GLuint)texture
+{
+    GLKMatrix4 modelMatrix = GLKMatrix4Identity;
+    GLKMatrix4 modelViewMatrix = GLKMatrix4Multiply(viewMatrix, modelMatrix);
+    GLKMatrix4 modelViewProjection = GLKMatrix4Multiply(projectionMatrix, modelViewMatrix);
+    glUseProgram(_metaballProgram);
+    glVertexAttribPointer(metaballVertexAttribute, 3, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].position);
+    glVertexAttribPointer(metaballTexCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].texCoord);
+    glEnableVertexAttribArray(metaballVertexAttribute);
+    glEnableVertexAttribArray(metaballTexCoordAttribute);
+    
+//    glActiveTexture(GL_TEXTURE0);
+//    glBindTexture(GL_TEXTURE_2D, texture);
+//    glUniform1i(metaballDataTextureUniform, 0 /*GL_TEXTURE0*/);
+    
+    glUniformMatrix4fv(metaballMVPMatrixUniform, 1, GL_FALSE, modelViewProjection.m);
+    glDrawElements(GL_TRIANGLES, QuadNumIndices, GL_UNSIGNED_INT, quadIndices);
+    glDisableVertexAttribArray(metaballVertexAttribute);
+    glDisableVertexAttribArray(metaballTexCoordAttribute);
+    glUseProgram(0);
+}
+
 - (void)setupGL
 {
     [EAGLContext setCurrentContext:self.context];
     
-    _program = [ROTOShaderLoader loadShaders];
+    _program = [ROTOShaderLoader loadDefaultShader];
+    _metaballProgram = [ROTOShaderLoader loadMetaballShader];
     
     glEnable(GL_DEPTH_TEST);
     
-    glGenVertexArraysOES(1, &_vertexArray);
-    glBindVertexArrayOES(_vertexArray);
+//    glGenVertexArraysOES(1, &_vertexArray);
+//    glBindVertexArrayOES(_vertexArray);
+//    
+//    glGenBuffers(1, &_vertexBuffer);
+//    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+//    
+//    glEnableVertexAttribArray(GLKVertexAttribPosition);
+//    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(0));
+//    glEnableVertexAttribArray(GLKVertexAttribNormal);
+//    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ)));
+//    glEnableVertexAttribArray(GLKVertexAttribColor);
+//    glVertexAttribPointer(GLKVertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ) * 2));
+//    
+//    glBindVertexArrayOES(0);
     
-    glGenBuffers(1, &_vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     
-    glEnableVertexAttribArray(GLKVertexAttribPosition);
-    glVertexAttribPointer(GLKVertexAttribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(0));
-    glEnableVertexAttribArray(GLKVertexAttribNormal);
-    glVertexAttribPointer(GLKVertexAttribNormal, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ)));
-    glEnableVertexAttribArray(GLKVertexAttribColor);
-    glVertexAttribPointer(GLKVertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(TriangleVertex), BUFFER_OFFSET(sizeof(XYZ) * 2));
     
-    glBindVertexArrayOES(0);
+    NSString *extensionString = [NSString stringWithUTF8String:(char *)glGetString(GL_EXTENSIONS)];
+    NSArray *extensions = [extensionString componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    for (NSString *oneExtension in extensions)
+        NSLog(@"%@", oneExtension);
     
-//    glEnable(GL_CULL_FACE);
+    
+    glGenTextures (1, &_dataTexture);
+    glBindTexture(GL_TEXTURE_2D, _dataTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // set texenv to replace instead of the default modulate
+//    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED_EXT, 256, 256, 0, GL_RED_EXT, GL_FLOAT, NULL);
 }
 
 - (void)tearDownGL
@@ -425,39 +468,45 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glClearColor(0.65f, 0.65f, 0.65f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glBindVertexArrayOES(_vertexArray);
+//    glBindVertexArrayOES(_vertexArray);
+//    
+//    // Render the object again with ES2
+//    glUseProgram(_program);
+//    
+//    glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
+//    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
+//    
+//    Metaball mb1, mb2, mb3, mb4;
+//    mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
+//    mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
+//    mb1.size = 0.5;
+//    
+//    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
+//    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
+//    mb2.size = 1;
+//    
+//    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
+//    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
+//    mb3.size = 2;
+//
+//    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
+//    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
+//    mb4.size = 3;
+//
+//    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
+//    
+//    int numTriangles = meshMetaballs(_cellDim, _numXCells, _numYCells, _numZCells, &mb1, _triangles, _gridCells, _gridVertices, _timeElapsed);
+//    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+//    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(Triangle), _triangles, GL_STATIC_DRAW);
+//    
+//    glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
+////    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
     
-    // Render the object again with ES2
-    glUseProgram(_program);
-    
-    glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
-    glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
-    
-    Metaball mb1, mb2, mb3, mb4;
-    mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
-    mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
-    mb1.size = 0.5;
-    
-    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
-    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
-    mb2.size = 1;
-    
-    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
-    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
-    mb3.size = 2;
 
-    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
-    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
-    mb4.size = 3;
-
-    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
-    
-    int numTriangles = meshMetaballs(_cellDim, _numXCells, _numYCells, _numZCells, &mb1, _triangles, _gridCells, _gridVertices, _timeElapsed);
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(Triangle), _triangles, GL_STATIC_DRAW);
-    
-    glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
-//    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
+//    glBindVertexArrayOES(0);
+    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(-1, 1, -1, 1, -1, 1);
+    GLKMatrix4 quadModelViewMatrix = GLKMatrix4Identity;
+    [self drawQuadWithViewMatrix:quadModelViewMatrix projectionMatrix:ortho texture:0];
 }
 
 #pragma mark - Touch Handling

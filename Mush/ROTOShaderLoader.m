@@ -13,7 +13,7 @@
 
 #pragma mark - OpenGL ES 2 shader compilation
 
-+ (GLuint)loadShaders
++ (GLuint)loadDefaultShader
 {
     GLuint vertShader, fragShader;
     NSString *vertShaderPathname, *fragShaderPathname;
@@ -70,6 +70,76 @@
     // Get uniform locations.
     uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX] = glGetUniformLocation(program, "modelViewProjectionMatrix");
     uniforms[UNIFORM_NORMAL_MATRIX] = glGetUniformLocation(program, "normalMatrix");
+    
+    // Release vertex and fragment shaders.
+    if (vertShader) {
+        glDetachShader(program, vertShader);
+        glDeleteShader(vertShader);
+    }
+    if (fragShader) {
+        glDetachShader(program, fragShader);
+        glDeleteShader(fragShader);
+    }
+    
+    return program;
+}
+
++ (GLuint)loadMetaballShader
+{
+    GLuint vertShader, fragShader;
+    NSString *vertShaderPathname, *fragShaderPathname;
+    
+    // Create shader program.
+    GLuint program = glCreateProgram();
+    
+    // Create and compile vertex shader.
+    vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"Metaball" ofType:@"vsh"];
+    if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname]) {
+        NSLog(@"Failed to compile vertex shader");
+        return NO;
+    }
+    
+    // Create and compile fragment shader.
+    fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"Metaball" ofType:@"fsh"];
+    if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname]) {
+        NSLog(@"Failed to compile fragment shader");
+        return NO;
+    }
+    
+    // Attach vertex shader to program.
+    glAttachShader(program, vertShader);
+    
+    // Attach fragment shader to program.
+    glAttachShader(program, fragShader);
+    
+    // Link program.
+    if (![self linkProgram:program]) {
+        NSLog(@"Failed to link program: %d", program);
+        
+        if (vertShader) {
+            glDeleteShader(vertShader);
+            vertShader = 0;
+        }
+        if (fragShader) {
+            glDeleteShader(fragShader);
+            fragShader = 0;
+        }
+        if (program) {
+            glDeleteProgram(program);
+            program = 0;
+        }
+        
+        return NO;
+    }
+    
+    // Get attribute locations.
+    // This needs to be done AFTER linking.
+    metaballVertexAttribute = glGetAttribLocation(program, "position");
+    metaballTexCoordAttribute = glGetAttribLocation(program, "texCoords");
+    
+    // Get uniform locations.
+    metaballMVPMatrixUniform = glGetUniformLocation(program, "modelViewProjectionMatrix");
+    metaballDataTextureUniform = glGetUniformLocation(program, "dataTexture");
     
     // Release vertex and fragment shaders.
     if (vertShader) {

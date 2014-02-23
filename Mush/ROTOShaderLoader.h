@@ -16,8 +16,14 @@ enum
 };
 GLint uniforms[NUM_UNIFORMS];
 
+GLint metaballVertexAttribute;
+GLint metaballTexCoordAttribute;
+GLint metaballMVPMatrixUniform;
+GLint metaballDataTextureUniform;
+
 @interface ROTOShaderLoader : NSObject
 
-+ (GLuint)loadShaders;
++ (GLuint)loadDefaultShader;
++ (GLuint)loadMetaballShader;
 
 @end

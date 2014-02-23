@@ -6,13 +6,11 @@
 //  Copyright (c) 2013 Rototyping. All rights reserved.
 //
 
-#version 300 es
+attribute vec4 position;
+attribute vec3 normal;
+attribute vec3 color;
 
-in vec4 position;
-in vec3 normal;
-in vec3 color;
-
-out lowp vec4 colorVarying;
+varying lowp vec4 colorVarying;
 
 uniform mat4 modelViewProjectionMatrix;
 uniform mat3 normalMatrix;
