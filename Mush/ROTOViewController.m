@@ -73,6 +73,8 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     int _numXCells;
     int _numYCells;
     int _numZCells;
+    
+    int _textureDim;
 }
 @property (strong, nonatomic) EAGLContext *context;
 
@@ -90,10 +92,12 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
         NSLog(@"Failed to create ES context");
     }
     
-    _cellDim = 0.2;
-    _numXCells = 39;
-    _numYCells = 39;
-    _numZCells = 39;
+    _cellDim = 0.3;
+    _numXCells = 25;
+    _numYCells = 25;
+    _numZCells = 25;
+    
+    _textureDim = ceilf(sqrtf((_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1)));
     
     int maxTrianglesPerCell = 2;
     int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
@@ -215,17 +219,17 @@ static /*inline*/ void calcPointFieldStrengths(Metaball *metaballs, int numMetab
 //        float r = GLKVector3ManhattanLength(vector);
 //        float r = GLKVector3ConstantLength(vector);
         
-        if (r < 1.0)
-        {
+//        if (r < 1.0)
+//        {
             // Thanks Ryan Geiss & Ken Perlin! http://www.geisswerks.com/ryan/BLOBS/blobs.html
-            contribution = r * r * r * (r * (r * 6 - 15) + 10);
-//            contribution = 1.0 / pow(r, 2.0);
+//            contribution = r * r * r * (r * (r * 6 - 15) + 10);
+            contribution = 1.0 / pow(r, 2.0);
             
-            outContributions[numContributingMetaballs] = (1.0 - contribution);// * metaballs[i].size;
+            outContributions[numContributingMetaballs] = contribution;// * metaballs[i].size;
             outContributingMetaballs[numContributingMetaballs] = metaballs[i];
             ++numContributingMetaballs;
         }
-    }
+//    }
     *outNumContributingMetaballs = numContributingMetaballs;
 }
 
@@ -262,7 +266,7 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         NSLog(@"Num Metaballs: %d", numMetaballs);
     }
     
-    float threshold = 0.15;
+    float threshold = 0.85;
     
     float *contributions = (float *)malloc(numMetaballs * sizeof(float));
     Metaball *contributingMetaballs = (Metaball *)malloc(numMetaballs * sizeof(Metaball));
@@ -272,7 +276,8 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     GLKVector3 gridSize = GLKVector3Multiply(GLKVector3Make(numXCells, numYCells, numZCells), cellSize);
     GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
     
-    GLKVector3 *gridData = (GLKVector3 *)malloc(256 * 256 * sizeof(GLKVector3));
+    int textureDim = ceilf(sqrtf((numXCells + 1) * (numYCells + 1) * (numZCells + 1)));
+    GLKVector3 *gridData = (GLKVector3 *)malloc(textureDim * textureDim * sizeof(GLKVector3));
     
     for (int x = 0; x < numXCells + 1; x++)
     {
@@ -297,7 +302,7 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     }
 
     glBindTexture(GL_TEXTURE_2D, cellPositionsTexture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 256, GL_RGB , GL_FLOAT, gridData);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureDim, textureDim, GL_RGB , GL_FLOAT, gridData);
     free(gridData);
     
     for (int x = 0; x < numXCells; x++)
@@ -445,7 +450,7 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     // set texenv to replace instead of the default modulate
 //    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 256, 256, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _textureDim, _textureDim, 0, GL_RGB, GL_FLOAT, NULL);
 
     glGenTextures (1, &_metaballPositionsTexture);
     glBindTexture(GL_TEXTURE_2D, _metaballPositionsTexture);
@@ -566,10 +571,10 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     
 
 //    glBindVertexArrayOES(0);
-    glViewport(10, 10, 256, 256);
-    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, 256, 0, 256, -1, 1);
+    glViewport(10, 10, _textureDim, _textureDim);
+    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, _textureDim, 0, _textureDim, -1, 1);
 //    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(-1, 1, -1, 1, -1, 1);
-    GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(256, 256, 1);
+    GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(_textureDim, _textureDim, 1);
     [self drawQuadWithViewMatrix:quadModelViewMatrix projectionMatrix:ortho numMetaballs:numMetaballs];
 }
 
