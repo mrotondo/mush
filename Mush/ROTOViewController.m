@@ -449,6 +449,11 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glDrawElements(GL_TRIANGLES, QuadNumIndices, GL_UNSIGNED_INT, quadIndices);
     float *pixels = malloc(_textureDim * _textureDim * 4 * sizeof(float));
     glReadPixels(0, 0, _textureDim, _textureDim, GL_RGBA, GL_FLOAT, pixels);
+    
+    // do stuff with pixels
+    free(pixels);
+    
+    
     glBindFramebuffer(GL_FRAMEBUFFER, currentFramebuffer);
     
     glDisableVertexAttribArray(metaballVertexAttribute);

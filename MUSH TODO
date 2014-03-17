@@ -1,6 +1,15 @@
 MUSH TODO
 ---------
 
+NEW:
+
+- only populate cellPositionsTexture once
+- read out contributions from the cellValuesTexture instead of calculating them on CPU
+- calculate normals for each triangle by cross-producting two of its vertices, instead of doing weighted avg of metaball normals
+
+
+OLD:
+
 OPTIMIZATIONS
 - crawling cubes (start at a cell that's on the surface then only explore neighbor cells that are also on the surface)
 - collapse linked list (of metaballs) into an array of values, then do for loops instead of while loops (consider using pointer arithmetic instead of indexing), one loop for each step (difference, squared length, inversion) to see if it auto-vectorizes or as a step towards manual vectorization
