@@ -48,6 +48,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 @interface ROTOViewController () {
     GLuint _program;
     GLuint _metaballProgram;
+    GLuint _texturedQuadProgram;
     
     GLKMatrix4 _modelMatrix;
     GLKMatrix4 _viewMatrix;
@@ -63,6 +64,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     GLuint _cellPositionsTexture;
     GLuint _metaballPositionsTexture;
+    GLuint _cellValuesTexture;
     
     Triangle *_triangles;
     GridVertex *_gridVertices;
@@ -75,6 +77,8 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     int _numZCells;
     
     int _textureDim;
+    
+    GLuint _cellValuesFBO;
 }
 @property (strong, nonatomic) EAGLContext *context;
 
@@ -112,7 +116,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     view.drawableDepthFormat = GLKViewDrawableDepthFormat24;
 
     [self setupGL];
-    
+
 //    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
 //    [self.view addGestureRecognizer:tapRecognizer];
 
@@ -169,6 +173,8 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     free(_gridCells);
     free(_triangles);
     [self freeMetaballs];
+    
+    // delete all textures and fbos here
     
     if ([EAGLContext currentContext] == self.context) {
         [EAGLContext setCurrentContext:nil];
@@ -379,11 +385,42 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     return numTriangles;
 }
 
-- (void)drawQuadWithViewMatrix:(GLKMatrix4)viewMatrix projectionMatrix:(GLKMatrix4)projectionMatrix numMetaballs:(int)numMetaballs
+- (void)calcCellValuesWithMetaballs:(Metaball *)metaballs
 {
-    GLKMatrix4 modelMatrix = GLKMatrix4Identity;
-    GLKMatrix4 modelViewMatrix = GLKMatrix4Multiply(viewMatrix, modelMatrix);
-    GLKMatrix4 modelViewProjection = GLKMatrix4Multiply(projectionMatrix, modelViewMatrix);
+    // Count metaballs
+    int numMetaballs = 0;
+    Metaball *metaball = metaballs;
+    while (metaball != NULL)
+    {
+        ++numMetaballs;
+        metaball = metaball->next;
+    }
+    
+    
+    // Put metaball positions in texture
+    GLKVector3 *metaballPositionsData = (GLKVector3 *)malloc(64 * 64 * sizeof(GLKVector3));
+    int i = 0;
+    metaball = metaballs;
+    while (metaball != NULL)
+    {
+        metaballPositionsData[i++] = metaball->position;
+        metaball = metaball->next;
+    }
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, _metaballPositionsTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 64, 64, GL_RGB , GL_FLOAT, metaballPositionsData);
+    free(metaballPositionsData);
+    
+    
+    // Do the metaball contribution calculation on the GPU
+    int viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glViewport(0, 0, _textureDim, _textureDim);
+    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, _textureDim, 0, _textureDim, -1, 1);
+    GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(_textureDim, _textureDim, 1);
+
+    GLKMatrix4 modelViewMatrix = quadModelViewMatrix;
+    GLKMatrix4 modelViewProjection = GLKMatrix4Multiply(ortho, modelViewMatrix);
     glUseProgram(_metaballProgram);
     glVertexAttribPointer(metaballVertexAttribute, 3, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].position);
     glVertexAttribPointer(metaballTexCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].texCoord);
@@ -404,9 +441,45 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glUniform1f(metaballNumMetaballsUniform, numMetaballs);
     
     glUniformMatrix4fv(metaballMVPMatrixUniform, 1, GL_FALSE, modelViewProjection.m);
+
+    GLint currentFramebuffer;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &currentFramebuffer);
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, _cellValuesFBO);
     glDrawElements(GL_TRIANGLES, QuadNumIndices, GL_UNSIGNED_INT, quadIndices);
+    float *pixels = malloc(_textureDim * _textureDim * 4 * sizeof(float));
+    glReadPixels(0, 0, _textureDim, _textureDim, GL_RGBA, GL_FLOAT, pixels);
+    glBindFramebuffer(GL_FRAMEBUFFER, currentFramebuffer);
+    
     glDisableVertexAttribArray(metaballVertexAttribute);
     glDisableVertexAttribArray(metaballTexCoordAttribute);
+    glUseProgram(0);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+}
+
+- (void)drawQuadWithTexture:(GLuint)texture size:(GLKVector2)size
+{
+    glViewport(200, 10, size.x, size.y);
+    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, size.x, 0, size.y, -1, 1);
+    GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(size.x, size.y, 1);
+
+    GLKMatrix4 modelViewMatrix = quadModelViewMatrix;
+    GLKMatrix4 modelViewProjection = GLKMatrix4Multiply(ortho, modelViewMatrix);
+
+    glUseProgram(_texturedQuadProgram);
+    glVertexAttribPointer(texturedQuadVertexAttribute, 3, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].position);
+    glVertexAttribPointer(texturedQuadTexCoordAttribute, 2, GL_FLOAT, GL_FALSE, sizeof(EntityVertex), &quadVertices[0].texCoord);
+    glEnableVertexAttribArray(texturedQuadVertexAttribute);
+    glEnableVertexAttribArray(texturedQuadTexCoordAttribute);
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glUniform1i(texturedQuadTextureUniform, 0 /*GL_TEXTURE0*/);
+    
+    glUniformMatrix4fv(texturedQuadMVPMatrixUniform, 1, GL_FALSE, modelViewProjection.m);
+    glDrawElements(GL_TRIANGLES, QuadNumIndices, GL_UNSIGNED_INT, quadIndices);
+    glDisableVertexAttribArray(texturedQuadVertexAttribute);
+    glDisableVertexAttribArray(texturedQuadTexCoordAttribute);
     glUseProgram(0);
 }
 
@@ -416,6 +489,7 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     
     _program = [ROTOShaderLoader loadDefaultShader];
     _metaballProgram = [ROTOShaderLoader loadMetaballShader];
+    _texturedQuadProgram = [ROTOShaderLoader loadTexturedQuadShader];
     
     glEnable(GL_DEPTH_TEST);
     
@@ -448,8 +522,6 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    // set texenv to replace instead of the default modulate
-//    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, _textureDim, _textureDim, 0, GL_RGB, GL_FLOAT, NULL);
 
     glGenTextures (1, &_metaballPositionsTexture);
@@ -458,10 +530,33 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    // set texenv to replace instead of the default modulate
-    //    glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 64, 64, 0, GL_RGB, GL_FLOAT, NULL);
 
+    glGenTextures (1, &_cellValuesTexture);
+    glBindTexture(GL_TEXTURE_2D, _cellValuesTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED_EXT, _textureDim, _textureDim, 0, GL_RED_EXT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED_EXT, _textureDim, _textureDim, 0, GL_RED_EXT, GL_HALF_FLOAT_OES, NULL);
+    
+    glGenFramebuffers(1, &_cellValuesFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, _cellValuesFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _cellValuesTexture, 0);
+    GLenum completeness = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    NSLog(@"COMPLETE? %@", completeness == GL_FRAMEBUFFER_COMPLETE ? @"YES" : @"NO");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR)
+    {
+        NSLog(@"THERE IS ERROR");
+    }
+    else
+    {
+        NSLog(@"NO ERROR");
+    }
 }
 
 - (void)tearDownGL
@@ -502,6 +597,31 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect
 {
+    Metaball mb1;//, mb2, mb3, mb4;
+    mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
+    mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
+    mb1.size = 0.5;
+    
+//    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
+//    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
+//    mb2.size = 1;
+//    
+//    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
+//    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
+//    mb3.size = 2;
+//
+//    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
+//    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
+//    mb4.size = 3;
+//
+//    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
+    
+    mb1.next = NULL;
+    
+    [self calcCellValuesWithMetaballs:&mb1];
+    
+    
+ 
     glClearColor(0.65f, 0.65f, 0.65f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
@@ -513,69 +633,18 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glUniformMatrix4fv(uniforms[UNIFORM_MODELVIEWPROJECTION_MATRIX], 1, 0, _modelViewProjectionMatrix.m);
     glUniformMatrix3fv(uniforms[UNIFORM_NORMAL_MATRIX], 1, 0, _normalMatrix.m);
     
-    Metaball mb1, mb2, mb3, mb4;
-    mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
-    mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
-    mb1.size = 0.5;
-    
-    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
-    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
-    mb2.size = 1;
-    
-    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
-    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
-    mb3.size = 2;
-
-    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
-    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
-    mb4.size = 3;
-
-    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
-    
     int numTriangles = meshMetaballs(_cellDim, _numXCells, _numYCells, _numZCells, &mb1, _triangles, _gridCells, _gridVertices, _timeElapsed, _cellPositionsTexture);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, numTriangles * sizeof(Triangle), _triangles, GL_STATIC_DRAW);
     
     glDrawArrays(GL_TRIANGLES, 0, numTriangles * 3);
-//    glDrawArrays(GL_LINE_STRIP, 0, numTriangles * 3);
     
     
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArrayOES(0);
 
     
-    
-    
-    
-    // METABALL DISTANCE CALC ON GPU
-    int numMetaballs = 0;
-    Metaball *metaball = &mb1;
-    while (metaball != NULL)
-    {
-        ++numMetaballs;
-        metaball = metaball->next;
-    }
-    
-    GLKVector3 *metaballPositionsData = (GLKVector3 *)malloc(64 * 64 * sizeof(GLKVector3));
-    metaball = &mb1;
-    int i = 0;
-    while (metaball != NULL)
-    {
-        metaballPositionsData[i++] = metaball->position;
-        metaball = metaball->next;
-    }
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, _metaballPositionsTexture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 64, 64, GL_RGB , GL_FLOAT, metaballPositionsData);
-    free(metaballPositionsData);
-    
-
-//    glBindVertexArrayOES(0);
-    glViewport(10, 10, _textureDim, _textureDim);
-    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, _textureDim, 0, _textureDim, -1, 1);
-//    GLKMatrix4 ortho = GLKMatrix4MakeOrtho(-1, 1, -1, 1, -1, 1);
-    GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(_textureDim, _textureDim, 1);
-    [self drawQuadWithViewMatrix:quadModelViewMatrix projectionMatrix:ortho numMetaballs:numMetaballs];
+    [self drawQuadWithTexture:_cellValuesTexture size:GLKVector2Make(_textureDim, _textureDim)];
 }
 
 #pragma mark - Touch Handling

@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		D5319A8818B7C2D200751F30 /* MetaballDistances.fsh in Resources */ = {isa = PBXBuildFile; fileRef = D5FE41C618B205A800B90B9A /* MetaballDistances.fsh */; };
 		D5319A8918B7C2D200751F30 /* MetaballDistances.vsh in Resources */ = {isa = PBXBuildFile; fileRef = D5FE41C718B205A800B90B9A /* MetaballDistances.vsh */; };
+		D5734C2718D6B23400064205 /* TexturedQuad.fsh in Resources */ = {isa = PBXBuildFile; fileRef = D5734C2518D6B23400064205 /* TexturedQuad.fsh */; };
+		D5734C2818D6B23400064205 /* TexturedQuad.vsh in Resources */ = {isa = PBXBuildFile; fileRef = D5734C2618D6B23400064205 /* TexturedQuad.vsh */; };
 		D586F03C184DA48B00FE89BD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D586F03B184DA48B00FE89BD /* Foundation.framework */; };
 		D586F03E184DA48B00FE89BD /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D586F03D184DA48B00FE89BD /* CoreGraphics.framework */; };
 		D586F040184DA48B00FE89BD /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D586F03F184DA48B00FE89BD /* UIKit.framework */; };
@@ -45,6 +47,8 @@
 /* Begin PBXFileReference section */
 		D5319A8618B7BEBD00751F30 /* EntityVertex.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EntityVertex.h; sourceTree = "<group>"; };
 		D5319A8718B7BEBD00751F30 /* Quad.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Quad.h; sourceTree = "<group>"; };
+		D5734C2518D6B23400064205 /* TexturedQuad.fsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = TexturedQuad.fsh; path = Shaders/TexturedQuad.fsh; sourceTree = "<group>"; };
+		D5734C2618D6B23400064205 /* TexturedQuad.vsh */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.glsl; name = TexturedQuad.vsh; path = Shaders/TexturedQuad.vsh; sourceTree = "<group>"; };
 		D586F038184DA48B00FE89BD /* Mush.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mush.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D586F03B184DA48B00FE89BD /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		D586F03D184DA48B00FE89BD /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
@@ -146,6 +150,8 @@
 				D5FE41C718B205A800B90B9A /* MetaballDistances.vsh */,
 				D586F057184DA48B00FE89BD /* Shader.fsh */,
 				D586F059184DA48B00FE89BD /* Shader.vsh */,
+				D5734C2518D6B23400064205 /* TexturedQuad.fsh */,
+				D5734C2618D6B23400064205 /* TexturedQuad.vsh */,
 				D586F05B184DA48B00FE89BD /* ROTOViewController.h */,
 				D586F05C184DA48B00FE89BD /* ROTOViewController.m */,
 				D586F05E184DA48B00FE89BD /* Images.xcassets */,
@@ -266,6 +272,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5734C2818D6B23400064205 /* TexturedQuad.vsh in Resources */,
+				D5734C2718D6B23400064205 /* TexturedQuad.fsh in Resources */,
 				D5319A8818B7C2D200751F30 /* MetaballDistances.fsh in Resources */,
 				D5319A8918B7C2D200751F30 /* MetaballDistances.vsh in Resources */,
 				D586F058184DA48B00FE89BD /* Shader.fsh in Resources */,

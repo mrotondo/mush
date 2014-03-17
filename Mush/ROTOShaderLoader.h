@@ -24,9 +24,16 @@ GLint metaballMetaballPositionsTextureUniform;
 GLint metaballMetaballPositionsTextureSizeUniform;
 GLint metaballNumMetaballsUniform;
 
+GLint texturedQuadVertexAttribute;
+GLint texturedQuadTexCoordAttribute;
+GLint texturedQuadMVPMatrixUniform;
+GLint texturedQuadTextureUniform;
+
+
 @interface ROTOShaderLoader : NSObject
 
 + (GLuint)loadDefaultShader;
 + (GLuint)loadMetaballShader;
++ (GLuint)loadTexturedQuadShader;
 
 @end

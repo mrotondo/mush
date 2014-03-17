@@ -23,15 +23,15 @@ void main()
     highp float y = 0.0;
     while (i < numMetaballs)
     {
-        x = i;// % metaballPositionsTextureSize.x;
         y = floor(i / metaballPositionsTextureSize.x);
+        x = i - y * metaballPositionsTextureSize.x;
         highp vec3 metaballPosition = texture2D(metaballPositionsTexture, vec2(x, y)).xyz;
         highp float r = distance(cellPosition, metaballPosition);
-        if (r < 1.0)
-        {
-            highp float contribution = 1.0 - (r * r * r * (r * (r * 6.0 - 15.0) + 10.0));
-            totalContribution = totalContribution + contribution;
-        }
+        
+        highp float contribution = 1.0 / pow(r, 2.0);
+        
+        totalContribution = totalContribution + contribution;
+
         i = i + 1.0;
     }
 

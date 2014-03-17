@@ -157,6 +157,76 @@
     return program;
 }
 
++ (GLuint)loadTexturedQuadShader
+{
+    GLuint vertShader, fragShader;
+    NSString *vertShaderPathname, *fragShaderPathname;
+    
+    // Create shader program.
+    GLuint program = glCreateProgram();
+    
+    // Create and compile vertex shader.
+    vertShaderPathname = [[NSBundle mainBundle] pathForResource:@"TexturedQuad" ofType:@"vsh"];
+    if (![self compileShader:&vertShader type:GL_VERTEX_SHADER file:vertShaderPathname]) {
+        NSLog(@"Failed to compile vertex shader");
+        return NO;
+    }
+    
+    // Create and compile fragment shader.
+    fragShaderPathname = [[NSBundle mainBundle] pathForResource:@"TexturedQuad" ofType:@"fsh"];
+    if (![self compileShader:&fragShader type:GL_FRAGMENT_SHADER file:fragShaderPathname]) {
+        NSLog(@"Failed to compile fragment shader");
+        return NO;
+    }
+    
+    // Attach vertex shader to program.
+    glAttachShader(program, vertShader);
+    
+    // Attach fragment shader to program.
+    glAttachShader(program, fragShader);
+    
+    // Link program.
+    if (![self linkProgram:program]) {
+        NSLog(@"Failed to link program: %d", program);
+        
+        if (vertShader) {
+            glDeleteShader(vertShader);
+            vertShader = 0;
+        }
+        if (fragShader) {
+            glDeleteShader(fragShader);
+            fragShader = 0;
+        }
+        if (program) {
+            glDeleteProgram(program);
+            program = 0;
+        }
+        
+        return NO;
+    }
+    
+    // Get attribute locations.
+    // This needs to be done AFTER linking.
+    texturedQuadVertexAttribute = glGetAttribLocation(program, "aPosition");
+    texturedQuadTexCoordAttribute = glGetAttribLocation(program, "aTexCoords");
+    
+    // Get uniform locations.
+    texturedQuadMVPMatrixUniform = glGetUniformLocation(program, "uModelViewProjectionMatrix");
+    texturedQuadTextureUniform = glGetUniformLocation(program, "uTexture");
+    
+    // Release vertex and fragment shaders.
+    if (vertShader) {
+        glDetachShader(program, vertShader);
+        glDeleteShader(vertShader);
+    }
+    if (fragShader) {
+        glDetachShader(program, fragShader);
+        glDeleteShader(fragShader);
+    }
+    
+    return program;
+}
+
 + (BOOL)compileShader:(GLuint *)shader type:(GLenum)type file:(NSString *)file
 {
     GLint status;
