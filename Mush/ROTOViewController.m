@@ -104,22 +104,14 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     _textureDim = ceilf(sqrtf((_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1)));
     
-    int maxTrianglesPerCell = 2;
-    int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
-    int numGridCells = _numXCells * _numYCells * _numZCells;
-    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
-    _gridVertices = malloc(numGridVertices * sizeof(GridVertex));
-    _gridCells = malloc(numGridCells * sizeof(GridCell));
-    _triangles = malloc(maxTotalTriangles * sizeof(Triangle));
-    
     GLKView *view = (GLKView *)self.view;
     view.context = self.context;
     view.drawableDepthFormat = GLKViewDrawableDepthFormat24;
 
     [self setupGL];
 
-//    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
-//    [self.view addGestureRecognizer:tapRecognizer];
+    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(handleTap:)];
+    [self.view addGestureRecognizer:tapRecognizer];
 
     UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.view addGestureRecognizer:panRecognizer];
@@ -138,12 +130,13 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 
 - (void)initGrid
 {
-    int maxTrianglesPerCell = 2;
     int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
     int numGridCells = _numXCells * _numYCells * _numZCells;
-    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
     _gridVertices = malloc(numGridVertices * sizeof(GridVertex));
     _gridCells = malloc(numGridCells * sizeof(GridCell));
+
+    int maxTrianglesPerCell = 4;
+    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
     _triangles = malloc(maxTotalTriangles * sizeof(Triangle));
     
     int textureDim = ceilf(sqrtf((_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1)));
@@ -164,6 +157,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
                 
                 GridVertex vertex;
                 vertex.p = XYZFromGLKVector3(vertexPosition);
+                
                 _gridVertices[gridVertexIndex] = vertex;
             }
         }
@@ -327,6 +321,12 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         ++numMetaballs;
         metaball = metaball->next;
     }
+    
+    if (numMetaballs % 10 == 0)
+    {
+        NSLog(@"NUM MB: %d", numMetaballs);
+    }
+    
     Metaball mbArray[numMetaballs];
     int mbIndex = 0;
     metaball = metaballs;
@@ -354,7 +354,13 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 GLKVector3 vertexPosition = GLKVector3FromXYZ(gridVertices[gridVertexIndex].p);
                 int numContributingMetaballs = 0;
                 calcPointFieldStrengths(mbArray, numMetaballs, vertexPosition, contributions, contributingMetaballs, &numContributingMetaballs);
-                gridVertices[gridVertexIndex].val = sumFloats(contributions, numContributingMetaballs);
+
+                float val = sumFloats(contributions, numContributingMetaballs);
+                gridVertices[gridVertexIndex].val = val;
+//                if (val > threshold / 2.0f)
+//                {
+//                    gridVertices[gridVertexIndex].val += 0.1f * (arc4random() / (float)0x100000000);
+//                }
             }
         }
     }
@@ -480,6 +486,9 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 
 - (void)drawQuadWithTexture:(GLuint)texture size:(GLKVector2)size
 {
+    GLint viewport[4] = {};
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    
     glViewport(200, 10, size.x, size.y);
     GLKMatrix4 ortho = GLKMatrix4MakeOrtho(0, size.x, 0, size.y, -1, 1);
     GLKMatrix4 quadModelViewMatrix = GLKMatrix4MakeScale(size.x, size.y, 1);
@@ -502,6 +511,8 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     glDisableVertexAttribArray(texturedQuadVertexAttribute);
     glDisableVertexAttribArray(texturedQuadTexCoordAttribute);
     glUseProgram(0);
+
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 }
 
 - (void)setupGL
@@ -635,14 +646,15 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
     mb4.size = 3;
 
-    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4;// mb4.next = _metaballs;
+    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
     
 //    mb1.next = NULL;
-    mb4.next = NULL;
+//    mb4.next = NULL;
+    
+    
+    
     
     [self calcCellValuesWithMetaballs:&mb1];
-    
-    
  
     glClearColor(0.65f, 0.65f, 0.65f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
