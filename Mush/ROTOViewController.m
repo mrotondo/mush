@@ -168,6 +168,36 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
             }
         }
     }
+    
+    for (int x = 0; x < _numXCells; x++)
+    {
+        for (int y = 0; y < _numYCells; y++)
+        {
+            for (int z = 0; z < _numZCells; z++)
+            {
+                GridCell cell;
+                int offsets[8][3] = {
+                    {0, 0, 1},
+                    {1, 0, 1},
+                    {1, 0, 0},
+                    {0, 0, 0},
+                    {0, 1, 1},
+                    {1, 1, 1},
+                    {1, 1, 0},
+                    {0, 1, 0}
+                };
+                for (int i = 0; i < 8; i++)
+                {
+                    int vertexIndex = (y + offsets[i][1]) * (_numXCells + 1) * (_numZCells + 1) + (z + offsets[i][2]) * (_numXCells + 1) + (x + offsets[i][0]);
+                    cell.v[i] = &(_gridVertices[vertexIndex]);
+                }
+
+                int gridCellIndex = y * _numXCells * _numZCells + z * _numXCells + x;
+                _gridCells[gridCellIndex] = cell;
+            }
+        }
+    }
+    
     glBindTexture(GL_TEXTURE_2D, _cellPositionsTexture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureDim, textureDim, GL_RGB , GL_FLOAT, gridData);
 }
@@ -306,11 +336,6 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         metaball = metaball->next;
     }
 
-    if (numMetaballs % 10 == 0)
-    {
-        NSLog(@"Num Metaballs: %d", numMetaballs);
-    }
-    
     float threshold = 0.85;
     
     float *contributions = (float *)malloc(numMetaballs * sizeof(float));
@@ -340,28 +365,11 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         {
             for (int z = 0; z < numZCells; z++)
             {
-                GridCell cell;
-                int offsets[8][3] = {
-                    {0, 0, 1},
-                    {1, 0, 1},
-                    {1, 0, 0},
-                    {0, 0, 0},
-                    {0, 1, 1},
-                    {1, 1, 1},
-                    {1, 1, 0},
-                    {0, 1, 0}
-                };
-                for (int i = 0; i < 8; i++)
-                {
-                    int vertexIndex = (y + offsets[i][1]) * (numXCells + 1) * (numZCells + 1) + (z + offsets[i][2]) * (numXCells + 1) + (x + offsets[i][0]);
-                    GridVertex vertex = gridVertices[vertexIndex];
-                    cell.v[i] = vertex;
-                }
-
+                int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
+                
                 int lowerFrontLeftVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
                 GridVertex lowerFrontLeft = gridVertices[lowerFrontLeftVertexIndex];
                 GLKVector3 cellCenter = GLKVector3Add(GLKVector3FromXYZ(lowerFrontLeft.p), halfCellSize);
-                GLKVector3 normal = GLKVector3Make(0, 0, 0);
                 GLKVector3 color = GLKVector3Make(0, 0, 0);
                 float totalForce = 0;
                 int numContributingMetaballs = 0;
@@ -370,25 +378,12 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                 {
                     for (int i = 0; i < numContributingMetaballs; i++)
                     {
-                        GLKVector3 metaballNormal = GLKVector3Normalize(GLKVector3Subtract(cellCenter, contributingMetaballs[i].position));
-                        normal = GLKVector3Add(GLKVector3MultiplyScalar(metaballNormal, contributions[i]), normal);
                         color = GLKVector3Add(GLKVector3MultiplyScalar(contributingMetaballs[i].color, contributions[i]), color);
                         totalForce += contributions[i];
                     }
                     color = GLKVector3DivideScalar(color, totalForce);
-                    cell.c = XYZFromGLKVector3(color);
+                    gridCells[gridCellIndex].c = XYZFromGLKVector3(color);
                 }
-//                for (int i = 0; i < 8; i++)
-//                {
-//                    XYZ extrudedP;
-//                    extrudedP.x = cell.v[i].p.x + normal.x;// * sin(time * cell.v[i].p.y) * 0.1;
-//                    extrudedP.y = cell.v[i].p.y + normal.y;// * sin(time * cell.v[i].p.y) * 0.1;
-//                    extrudedP.z = cell.v[i].p.z + normal.z;// * sin(time * cell.v[i].p.y) * 0.1;
-//                    cell.v[i].p = extrudedP;
-//                }
-
-                int gridCellIndex = y * numXCells * numZCells + z * numXCells + x;
-                gridCells[gridCellIndex] = cell;
             }
         }
     }
@@ -623,26 +618,27 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
 
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect
 {
-    Metaball mb1;//, mb2, mb3, mb4;
+    Metaball mb1, mb2, mb3, mb4;
     mb1.position = GLKVector3Make(cosf(5 * _rotation), 2 * sinf(_rotation), sinf(5 * _rotation));
     mb1.color = GLKVector3Make(0.8, 0.1, 0.1);
     mb1.size = 0.5;
     
-//    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
-//    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
-//    mb2.size = 1;
-//    
-//    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
-//    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
-//    mb3.size = 2;
-//
-//    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
-//    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
-//    mb4.size = 3;
-//
-//    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4; mb4.next = _metaballs;
+    mb2.position = GLKVector3Make(sinf(2 * _rotation), 2 * -cosf(_rotation), sinf(3 * _rotation));
+    mb2.color = GLKVector3Make(0.1, 0.8, 0.1);
+    mb2.size = 1;
     
-    mb1.next = NULL;
+    mb3.position = GLKVector3Make(1.2 * sinf(4 * _rotation),  -sinf(_rotation), cosf(8 * _rotation));
+    mb3.color = GLKVector3Make(0.1, 0.1, 0.8);
+    mb3.size = 2;
+
+    mb4.position = GLKVector3Make(0, 2 * cosf(2 * _rotation), 0);
+    mb4.color = GLKVector3Make(0.35, 0.35, 0.35);
+    mb4.size = 3;
+
+    mb1.next = &mb2; mb2.next = &mb3; mb3.next = &mb4;// mb4.next = _metaballs;
+    
+//    mb1.next = NULL;
+    mb4.next = NULL;
     
     [self calcCellValuesWithMetaballs:&mb1];
     
