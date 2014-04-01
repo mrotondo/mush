@@ -375,8 +375,6 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                         color = GLKVector3Add(GLKVector3MultiplyScalar(contributingMetaballs[i].color, contributions[i]), color);
                         totalForce += contributions[i];
                     }
-//                    normal = GLKVector3DivideScalar(normal, totalForce);
-//                    cell.n = XYZFromGLKVector3(normal);
                     color = GLKVector3DivideScalar(color, totalForce);
                     cell.c = XYZFromGLKVector3(color);
                 }

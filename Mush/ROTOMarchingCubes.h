@@ -20,7 +20,6 @@ typedef struct {
 
 typedef struct {
     GridVertex v[8];
-    XYZ n;
     XYZ c;
 } GridCell;
 
