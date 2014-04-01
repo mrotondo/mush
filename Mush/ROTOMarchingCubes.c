@@ -10,6 +10,26 @@
 
 #define ABS(x) (x < 0 ? -(x) : (x))
 
+static XYZ XYZSubtract(XYZ a, XYZ b)
+{
+    XYZ c = {
+        a.x - b.x,
+        a.y - b.y,
+        a.z - b.z
+    };
+    return c;
+}
+
+static XYZ XYZCrossProduct(XYZ a, XYZ b)
+{
+    XYZ c = {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+    return c;
+}
+
 // Thanks http://paulbourke.net/geometry/polygonise/
 static int edgeTable[256]={
     0x0  , 0x109, 0x203, 0x30a, 0x406, 0x50f, 0x605, 0x70c,
@@ -400,13 +420,22 @@ int Polygonise(GridCell cell, double isolevel, Triangle *triangles)
     /* Create the triangle */
     ntriang = 0;
     for (i=0;triTable[cubeindex][i]!=-1;i+=3) {
-        triangles[ntriang].v[0].p = vertlist[triTable[cubeindex][i  ]];
-        triangles[ntriang].v[1].p = vertlist[triTable[cubeindex][i+1]];
-        triangles[ntriang].v[2].p = vertlist[triTable[cubeindex][i+2]];
+        XYZ p0 = vertlist[triTable[cubeindex][i  ]];
+        XYZ p1 = vertlist[triTable[cubeindex][i+1]];
+        XYZ p2 = vertlist[triTable[cubeindex][i+2]];
+        
+        
+        triangles[ntriang].v[0].p = p0;
+        triangles[ntriang].v[1].p = p1;
+        triangles[ntriang].v[2].p = p2;
 
-        triangles[ntriang].v[0].n = cell.n;
-        triangles[ntriang].v[1].n = cell.n;
-        triangles[ntriang].v[2].n = cell.n;
+        XYZ v0 = XYZSubtract(p0, p1);
+        XYZ v1 = XYZSubtract(p0, p2);
+        XYZ n = XYZCrossProduct(v0, v1);
+        
+        triangles[ntriang].v[0].n = n;
+        triangles[ntriang].v[1].n = n;
+        triangles[ntriang].v[2].n = n;
         
         triangles[ntriang].v[0].c = cell.c;
         triangles[ntriang].v[1].c = cell.c;
@@ -417,4 +446,3 @@ int Polygonise(GridCell cell, double isolevel, Triangle *triangles)
     
     return(ntriang);
 }
-

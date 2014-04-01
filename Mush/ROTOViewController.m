@@ -68,6 +68,7 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     
     Triangle *_triangles;
     GridVertex *_gridVertices;
+    GLKVector3 *_gridPositionData;
     GridCell *_gridCells;
     Metaball *_metaballs;
 
@@ -123,6 +124,8 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
     UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(handlePan:)];
     [self.view addGestureRecognizer:panRecognizer];
     
+    [self initGrid];
+    
 //    for (int i = 0; i < 300; i++)
 //    {
 //        Metaball mb;
@@ -131,6 +134,42 @@ static GLKVector2 GLKVector2FromCGPoint(CGPoint p)
 //        mb.size = 0.5 + (arc4random() / (float)0x100000000);
 //        [self addMetaball:mb];
 //    }
+}
+
+- (void)initGrid
+{
+    int maxTrianglesPerCell = 2;
+    int numGridVertices = (_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1);
+    int numGridCells = _numXCells * _numYCells * _numZCells;
+    int maxTotalTriangles = maxTrianglesPerCell * numGridCells;
+    _gridVertices = malloc(numGridVertices * sizeof(GridVertex));
+    _gridCells = malloc(numGridCells * sizeof(GridCell));
+    _triangles = malloc(maxTotalTriangles * sizeof(Triangle));
+    
+    int textureDim = ceilf(sqrtf((_numXCells + 1) * (_numYCells + 1) * (_numZCells + 1)));
+    GLKVector3 *gridData = (GLKVector3 *)malloc(textureDim * textureDim * sizeof(GLKVector3));
+    
+    GLKVector3 gridSize = GLKVector3MultiplyScalar(GLKVector3Make(_numXCells, _numYCells, _numZCells), _cellDim);
+    GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
+    
+    for (int x = 0; x < _numXCells + 1; x++)
+    {
+        for (int y = 0; y < _numYCells + 1; y++)
+        {
+            for (int z = 0; z < _numZCells + 1; z++)
+            {
+                int gridVertexIndex = y * (_numXCells + 1) * (_numZCells + 1) + z * (_numXCells + 1) + x;
+                GLKVector3 vertexPosition = GLKVector3Subtract(GLKVector3Make(x * _cellDim, y * _cellDim, z * _cellDim), halfGridSize);
+                gridData[gridVertexIndex] = vertexPosition;
+                
+                GridVertex vertex;
+                vertex.p = XYZFromGLKVector3(vertexPosition);
+                _gridVertices[gridVertexIndex] = vertex;
+            }
+        }
+    }
+    glBindTexture(GL_TEXTURE_2D, _cellPositionsTexture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureDim, textureDim, GL_RGB , GL_FLOAT, gridData);
 }
 
 - (void)addMetaball:(Metaball)mb
@@ -279,11 +318,6 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
     
     GLKVector3 cellSize = GLKVector3Make(cellDim, cellDim, cellDim);
     GLKVector3 halfCellSize = GLKVector3DivideScalar(cellSize, 2.0);
-    GLKVector3 gridSize = GLKVector3Multiply(GLKVector3Make(numXCells, numYCells, numZCells), cellSize);
-    GLKVector3 halfGridSize = GLKVector3DivideScalar(gridSize, 2.0);
-    
-    int textureDim = ceilf(sqrtf((numXCells + 1) * (numYCells + 1) * (numZCells + 1)));
-    GLKVector3 *gridData = (GLKVector3 *)malloc(textureDim * textureDim * sizeof(GLKVector3));
     
     for (int x = 0; x < numXCells + 1; x++)
     {
@@ -291,25 +325,14 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
         {
             for (int z = 0; z < numZCells + 1; z++)
             {
-                GLKVector3 vertexPosition = GLKVector3Subtract(GLKVector3Make(x * cellDim, y * cellDim, z * cellDim), halfGridSize);
-                GridVertex vertex;
-                vertex.p = XYZFromGLKVector3(vertexPosition);
-
+                int gridVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
+                GLKVector3 vertexPosition = GLKVector3FromXYZ(gridVertices[gridVertexIndex].p);
                 int numContributingMetaballs = 0;
                 calcPointFieldStrengths(mbArray, numMetaballs, vertexPosition, contributions, contributingMetaballs, &numContributingMetaballs);
-                vertex.val = sumFloats(contributions, numContributingMetaballs);
-             
-                int gridVertexIndex = y * (numXCells + 1) * (numZCells + 1) + z * (numXCells + 1) + x;
-                gridVertices[gridVertexIndex] = vertex;
-                
-                gridData[gridVertexIndex] = vertexPosition;
+                gridVertices[gridVertexIndex].val = sumFloats(contributions, numContributingMetaballs);
             }
         }
     }
-
-    glBindTexture(GL_TEXTURE_2D, cellPositionsTexture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, textureDim, textureDim, GL_RGB , GL_FLOAT, gridData);
-    free(gridData);
     
     for (int x = 0; x < numXCells; x++)
     {
@@ -352,8 +375,8 @@ static int meshMetaballs(float cellDim, int numXCells, int numYCells, int numZCe
                         color = GLKVector3Add(GLKVector3MultiplyScalar(contributingMetaballs[i].color, contributions[i]), color);
                         totalForce += contributions[i];
                     }
-                    normal = GLKVector3DivideScalar(normal, totalForce);
-                    cell.n = XYZFromGLKVector3(normal);
+//                    normal = GLKVector3DivideScalar(normal, totalForce);
+//                    cell.n = XYZFromGLKVector3(normal);
                     color = GLKVector3DivideScalar(color, totalForce);
                     cell.c = XYZFromGLKVector3(color);
                 }
